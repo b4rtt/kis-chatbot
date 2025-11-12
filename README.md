@@ -566,11 +566,13 @@ export async function POST(req: NextRequest) {
 }
 ```
 
-## 🖥️ Volitelné UI (`app/page.tsx`)
+## 🖥️ UI s Markdown renderingem (`app/page.tsx`)
 
 ```tsx
 "use client";
 import { useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 export default function Page() {
   const [q, setQ] = useState("");
@@ -580,7 +582,7 @@ export default function Page() {
     const r = await fetch("/api/ask", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: q, localOnly: true }),
+      body: JSON.stringify({ query: q, localOnly: false }),
     });
     const data = await r.json();
     setMsgs((m) => [...m, { q, a: data.answer, c: data.citations }]);
@@ -611,8 +613,9 @@ export default function Page() {
             <div>
               <strong>You:</strong> {m.q}
             </div>
-            <div style={{ whiteSpace: "pre-wrap", marginTop: 8 }}>
-              <strong>Answer:</strong> {m.a}
+            <div style={{ marginTop: 8 }}>
+              <strong>Answer:</strong>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.a}</ReactMarkdown>
             </div>
             {m.c?.length ? (
               <div style={{ fontSize: 14, color: "#555", marginTop: 8 }}>
@@ -625,6 +628,12 @@ export default function Page() {
     </main>
   );
 }
+```
+
+**Instalace závislostí pro markdown:**
+
+```bash
+npm install react-markdown remark-gfm
 ```
 
 ## ▶️ Spuštění
@@ -713,7 +722,7 @@ curl -X POST http://localhost:3000/api/ask \
 
 - ✅ **Automatické renderování markdownu**: Odpovědi se nyní zobrazují s formátováním namísto surového markdownu
 - ✅ **Podpora pro**:
-  - **Tučný text** a *kurzíva*
+  - **Tučný text** a _kurzíva_
   - [Odkazy](https://example.com)
   - `Inline kód` a bloky kódu
   - Seznamy (odrážkové i číslované)
