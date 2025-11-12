@@ -9,7 +9,7 @@ async function ask() {
 const r = await fetch("/api/ask", {
 method: "POST",
 headers: {"Content-Type":"application/json"},
-body: JSON.stringify({ query: q, localOnly: true })
+body: JSON.stringify({ query: q, localOnly: false })
 });
 const data = await r.json();
 setMsgs(m => [...m, { q, a: data.answer, c: data.citations }]);
