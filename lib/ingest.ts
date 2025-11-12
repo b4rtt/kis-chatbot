@@ -5,6 +5,7 @@ import { embedTexts } from "./localEmbeddings";
 import { put } from "@vercel/blob";
 
 const DOCS_DIR = process.env.DOCS_DIR ?? "./docs";
+const INDEX_PATH = path.join(DOCS_DIR, "index.json");
 
 export async function ingestAllMarkdown() {
   const files: string[] = [];
@@ -17,7 +18,6 @@ export async function ingestAllMarkdown() {
         else if (e.isFile() && e.name.endsWith(".md")) files.push(p);
       }
     } catch (error) {
-      // If docs dir doesn't exist, just continue.
       if (error.code === 'ENOENT') {
         console.log(`Directory not found: ${dir}, skipping walk.`);
         return;
@@ -43,10 +43,18 @@ export async function ingestAllMarkdown() {
     });
   }
 
-  const indexJson = JSON.stringify({ items: all });
-  await put("index.json", indexJson, {
-    access: "public",
-    token: process.env.BLOB_READ_WRITE_TOKEN,
-  });
-  return { ok: true, files: files.length, chunks: all.length, indexPath: "index.json (Vercel Blob)" };
+  const indexJson = JSON.stringify({ items: all }, null, 2);
+
+  // Use Vercel Blob in production, otherwise use local filesystem
+  if (process.env.VERCEL_ENV) {
+    await put("index.json", indexJson, {
+      access: "public",
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+    });
+    return { ok: true, files: files.length, chunks: all.length, indexPath: "index.json (Vercel Blob)" };
+  } else {
+    await fs.mkdir(DOCS_DIR, { recursive: true });
+    await fs.writeFile(INDEX_PATH, indexJson, "utf8");
+    return { ok: true, files: files.length, chunks: all.length, indexPath: INDEX_PATH };
+  }
 }
