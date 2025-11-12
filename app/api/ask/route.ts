@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { loadIndex, topK } from "@/lib/search";
+import { loadIndex, topK, keywordSearch } from "@/lib/search";
 import OpenAI from "openai";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
@@ -85,7 +85,15 @@ const [qvec] = await embedTexts([query]);
 // Retrieve top-K chunks
 const index = await loadIndex();
 const items = index?.items ?? [];
-const passages = topK(qvec, items, Number(k) || 6);
+const vectorPassages = topK(qvec, items, Number(k) || 6);
+const keywordPassages = keywordSearch(query, items, 3);
+const merged = [...vectorPassages];
+for (const candidate of keywordPassages) {
+  if (!merged.find((p) => p.id === candidate.id)) {
+    merged.push(candidate);
+  }
+}
+const passages = merged.slice(0, Number(k) || 6);
 if (!passages.length) {
   return NextResponse.json({
     answer: CONTACT_MESSAGE,
@@ -99,7 +107,7 @@ const sys = "Odpovídej pouze z dodaného kontextu. Když informace chybí, řek
 const prompt = `${sys}\n\nQuestion: ${query}\n\nContext:\n${context}`;
 
 // Confidence threshold (optional)
-const maxScore = passages[0]?.score ?? 0;
+const maxScore = vectorPassages[0]?.score ?? 0;
 if (maxScore < 0.28 && !localOnly && process.env.OPENAI_API_KEY) {
   // fallback to cloud for tricky queries
   const chat = await openai.chat.completions.create({

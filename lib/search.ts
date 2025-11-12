@@ -8,6 +8,13 @@ const INDEX_PATH = path.join(DOCS_DIR, "index.json");
 export type IndexItem = { id: string; file: string; idx: number; content: string; vector: number[] };
 let _cache: { items: IndexItem[] } | null = null;
 
+function normalizeText(text: string) {
+  return text
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
 export async function loadIndex() {
   if (_cache) return _cache;
 
@@ -48,4 +55,25 @@ export function topK(qvec: number[], items: IndexItem[], k = 6) {
     .sort((a,b)=>b.score - a.score)
     .slice(0, k)
     .map(s => ({ ...s.it, score: s.score }));
+}
+
+export function keywordSearch(query: string, items: IndexItem[], limit = 3) {
+  const baseTokens = normalizeText(query)
+    .split(/\s+/)
+    .filter((tok) => tok.length > 2);
+  if (!baseTokens.length) return [];
+
+  return items
+    .map((it) => {
+      const text = normalizeText(`${it.file}\n${it.content}`);
+      const hits = baseTokens.reduce(
+        (count, token) => count + (text.includes(token) ? 1 : 0),
+        0
+      );
+      const coverage = hits / baseTokens.length;
+      return coverage > 0 ? { ...it, score: coverage } : null;
+    })
+    .filter((entry): entry is IndexItem & { score: number } => Boolean(entry))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
 }

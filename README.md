@@ -5,7 +5,7 @@ Plně lokální chatbot nad dokumentací, který může běžet na vlastním not
 ## ✨ Funkce
 - **HTTPS → lokální mirror**: `POST /api/admin/sync` stáhne `.md` soubory s využitím ETag/Last-Modified.
 - **Lokální vektorový index**: `POST /api/admin/reindex` vytvoří embeddingy pomocí `@xenova/transformers` do `docs/index.json`.
-- **RAG odpovědi**: `POST /api/ask` vrací top-K úryvky, generuje odpověď a přikládá citace.
+- **RAG odpovědi**: `POST /api/ask` kombinuje vektorové vyhledávání s fallbackem na klíčová slova, generuje odpověď a přikládá citace.
 - **Bez externí DB**: žádné Pinecone/Supabase, všechno žije v repozitáři.
 - **Volitelný lokální LLM**: Ollama (`llama3.1:8b-instruct`) pro 100% offline režim.
 - **Ochrana admin rout**: vše chráněno přes `x-admin-key`.
@@ -292,6 +292,7 @@ export async function ingestAllMarkdown() {
 
 ### `lib/search.ts`
 ```ts
+import { head } from "@vercel/blob";
 import fs from "fs/promises";
 import path from "path";
 
@@ -301,11 +302,34 @@ const INDEX_PATH = path.join(DOCS_DIR, "index.json");
 export type IndexItem = { id: string; file: string; idx: number; content: string; vector: number[] };
 let _cache: { items: IndexItem[] } | null = null;
 
+function normalizeText(text: string) {
+  return text
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
 export async function loadIndex() {
   if (_cache) return _cache;
-  const raw = await fs.readFile(INDEX_PATH, "utf8");
+
+  let raw: string;
+  if (process.env.VERCEL_ENV) {
+    const blob = await head("index.json", { token: process.env.BLOB_READ_WRITE_TOKEN });
+    const response = await fetch(blob.url);
+    if (!response.ok) {
+      throw new Error(`Failed to download index.json from blob storage. Status: ${response.status}`);
+    }
+    raw = await response.text();
+  } else {
+    raw = await fs.readFile(INDEX_PATH, "utf8");
+  }
+
   _cache = JSON.parse(raw);
   return _cache;
+}
+
+export function resetIndexCache() {
+  _cache = null;
 }
 
 export function topK(qvec: number[], items: IndexItem[], k = 6) {
@@ -315,6 +339,22 @@ export function topK(qvec: number[], items: IndexItem[], k = 6) {
     .sort((a,b)=>b.score - a.score)
     .slice(0, k)
     .map(s => ({ ...s.it, score: s.score }));
+}
+
+export function keywordSearch(query: string, items: IndexItem[], limit = 3) {
+  const tokens = normalizeText(query).split(/\s+/).filter((tok) => tok.length > 2);
+  if (!tokens.length) return [];
+
+  return items
+    .map((it) => {
+      const text = normalizeText(`${it.file}\n${it.content}`);
+      const hits = tokens.reduce((count, token) => count + (text.includes(token) ? 1 : 0), 0);
+      const coverage = hits / tokens.length;
+      return coverage > 0 ? { ...it, score: coverage } : null;
+    })
+    .filter((entry): entry is IndexItem & { score: number } => Boolean(entry))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
 }
 ```
 
@@ -357,7 +397,7 @@ export async function POST(req: NextRequest) {
 ### `app/api/ask/route.ts`
 ```ts
 import { NextRequest, NextResponse } from "next/server";
-import { loadIndex, topK } from "@/lib/search";
+import { loadIndex, topK, keywordSearch } from "@/lib/search";
 import OpenAI from "openai";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
@@ -378,22 +418,32 @@ async function generateLocal(prompt: string) {
 
 export async function POST(req: NextRequest) {
   const { query, k = 6, localOnly = true } = await req.json();
-  if (!query) return NextResponse.json({ error: "Missing query" }, { status: 400 });
+  if (!query) return NextResponse.json({ error: "Chybí dotaz" }, { status: 400 });
 
   const { embedTexts } = await import("@/lib/localEmbeddings");
   const [qvec] = await embedTexts([query]);
 
   const index = await loadIndex();
-  const passages = topK(qvec, index.items, Number(k) || 6);
-  const context = passages.map((p,i)=>`[#${i+1}] ${p.file}\n---\n${p.content}`).join("\n\n");
+  const items = index?.items ?? [];
+  const vectorPassages = topK(qvec, items, Number(k) || 6);
+  const keywordPassages = keywordSearch(query, items, 3);
+  const merged = [...vectorPassages];
+  for (const candidate of keywordPassages) {
+    if (!merged.find((p) => p.id === candidate.id)) merged.push(candidate);
+  }
+  const passages = merged.slice(0, Number(k) || 6);
+  if (!passages.length) {
+    return NextResponse.json({ answer: "Kontakt…", citations: [], cost: { ... } });
+  }
 
-  const sys = "You answer ONLY from the provided context. If info is missing, say 'Not in the docs.' Be concise and end with [#] citations.";
+  const context = passages.map((p,i)=>`[#${i+1}] ${p.file}\n---\n${p.content}`).join("\n\n");
+  const sys = "Odpovídej pouze z kontextu…";
   const prompt = `${sys}\n\nQuestion: ${query}\n\nContext:\n${context}`;
 
-  const maxScore = passages[0]?.score ?? 0;
+  const maxScore = vectorPassages[0]?.score ?? 0;
   if (maxScore < 0.28 && !localOnly && process.env.OPENAI_API_KEY) {
     const chat = await openai.chat.completions.create({
-      model: "gpt-4.1-mini",
+      model: "gpt-4o-mini",
       temperature: 0.2,
       messages: [
         { role: "system", content: sys },
@@ -409,7 +459,7 @@ export async function POST(req: NextRequest) {
   const answer = localOnly
     ? await generateLocal(prompt)
     : (await openai.chat.completions.create({
-        model: "gpt-4.1-mini",
+        model: "gpt-4o-mini",
         temperature: 0.2,
         messages: [{ role: "system", content: sys }, { role: "user", content: prompt }],
       })).choices[0].message.content ?? "";
