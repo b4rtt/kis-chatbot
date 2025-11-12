@@ -3,6 +3,7 @@
 Plně lokální chatbot nad dokumentací, který může běžet na vlastním notebooku nebo serveru. Umí stáhnout Markdown z veřejného HTTPS úložiště, vytvořit lokální embeddingy (bez Pinecone) a odpovídat pouze z vašeho obsahu. Pokud chcete, můžete generování provádět lokálním modelem přes Ollamu nebo levným cloudovým modelem.
 
 ## ✨ Funkce
+
 - **HTTPS → lokální mirror**: `POST /api/admin/sync` stáhne `.md` soubory s využitím ETag/Last-Modified.
 - **Lokální vektorový index**: `POST /api/admin/reindex` vytvoří embeddingy pomocí `@xenova/transformers` do `docs/index.json`.
 - **RAG odpovědi**: `POST /api/ask` kombinuje vektorové vyhledávání s fallbackem na klíčová slova, generuje odpověď a přikládá citace.
@@ -11,11 +12,13 @@ Plně lokální chatbot nad dokumentací, který může běžet na vlastním not
 - **Ochrana admin rout**: vše chráněno přes `x-admin-key`.
 
 ## 🧰 Předpoklady
+
 - Node.js 20+ a npm
 - Pro lokální embeddingy není potřeba nic dalšího (model se stáhne při prvním běhu)
 - Pro lokální LLM (volitelné): Ollama nainstalovaná a spuštěná
 
 ## 🚀 Rychlý start
+
 ```bash
 # 1) Vytvoř projekt
 npm create next@latest local-docs-chat --typescript --eslint
@@ -43,6 +46,7 @@ ENV
 ```
 
 Vytvoř `next.config.mjs`:
+
 ```js
 /** @type {import('next').NextConfig} */
 const nextConfig = { reactStrictMode: true };
@@ -50,6 +54,7 @@ export default nextConfig;
 ```
 
 Vytvoř `.gitignore`:
+
 ```
 node_modules
 .next
@@ -58,6 +63,7 @@ docs
 ```
 
 ## 📁 Struktura projektu
+
 ```
 local-docs-chat/
 ├─ app/
@@ -83,17 +89,26 @@ local-docs-chat/
 ## 🧱 Kód (zkopíruj do souborů)
 
 ### `lib/crawler.ts`
+
 ```ts
 const RAW_BASES = process.env.DOCS_BASE_URLS ?? process.env.DOCS_BASE_URL ?? "";
-const BASES = RAW_BASES.split(/[, \s]+/).map((b) => b.trim()).filter(Boolean);
+const BASES = RAW_BASES.split(/[, \s]+/)
+  .map((b) => b.trim())
+  .filter(Boolean);
 const MAX_PAGES = 200;
 
 if (!BASES.length) {
-  throw new Error("Set DOCS_BASE_URL or DOCS_BASE_URLS with at least one HTTPS root.");
+  throw new Error(
+    "Set DOCS_BASE_URL or DOCS_BASE_URLS with at least one HTTPS root."
+  );
 }
 
 function abs(u: string, base: string) {
-  try { return new URL(u, base).toString(); } catch { return null; }
+  try {
+    return new URL(u, base).toString();
+  } catch {
+    return null;
+  }
 }
 
 async function listFromManifest(base: string) {
@@ -112,21 +127,31 @@ async function listFromManifest(base: string) {
 }
 
 async function crawlBase(base: string) {
-  const seen = new Set<string>(), out = new Set<string>(), q = [base];
+  const seen = new Set<string>(),
+    out = new Set<string>(),
+    q = [base];
   while (q.length && seen.size < MAX_PAGES) {
     const u = q.shift()!;
-    if (seen.has(u)) continue; seen.add(u);
+    if (seen.has(u)) continue;
+    seen.add(u);
 
     let res: Response;
-    try { res = await fetch(u, { redirect: "follow" }); } catch { continue; }
+    try {
+      res = await fetch(u, { redirect: "follow" });
+    } catch {
+      continue;
+    }
     if (!res.ok) continue;
 
     const ct = res.headers.get("content-type") || "";
-    if (ct.includes("text/markdown") || u.endsWith(".md")) { out.add(u); continue; }
+    if (ct.includes("text/markdown") || u.endsWith(".md")) {
+      out.add(u);
+      continue;
+    }
     if (!ct.includes("text/html")) continue;
 
     const html = await res.text();
-    const links = Array.from(html.matchAll(/href="([^"]+)"/g)).map(m => m[1]);
+    const links = Array.from(html.matchAll(/href="([^"]+)"/g)).map((m) => m[1]);
     for (const l of links) {
       const u2 = abs(l, base);
       if (!u2 || !u2.startsWith(base)) continue;
@@ -151,7 +176,9 @@ export async function listMarkdownUrls(): Promise<string[]> {
   }
 
   if (!urls.size) {
-    throw new Error("No .md URLs found. Provide index.json manifests or check DOCS_BASE_URLS.");
+    throw new Error(
+      "No .md URLs found. Provide index.json manifests or check DOCS_BASE_URLS."
+    );
   }
 
   return Array.from(urls);
@@ -159,6 +186,7 @@ export async function listMarkdownUrls(): Promise<string[]> {
 ```
 
 ### `lib/sync.ts`
+
 ```ts
 import fs from "fs/promises";
 import path from "path";
@@ -170,7 +198,11 @@ const CACHE_FILE = path.join(DOCS_DIR, ".cache.json");
 type Cache = Record<string, { etag?: string; lastModified?: string }>;
 
 async function readCache(): Promise<Cache> {
-  try { return JSON.parse(await fs.readFile(CACHE_FILE, "utf8")); } catch { return {}; }
+  try {
+    return JSON.parse(await fs.readFile(CACHE_FILE, "utf8"));
+  } catch {
+    return {};
+  }
 }
 async function writeCache(c: Cache) {
   await fs.mkdir(DOCS_DIR, { recursive: true });
@@ -191,7 +223,8 @@ export async function syncDocs() {
     const headers: Record<string, string> = {};
     const meta = cache[u];
     if (meta?.etag) headers["If-None-Match"] = meta.etag;
-    else if (meta?.lastModified) headers["If-Modified-Since"] = meta.lastModified;
+    else if (meta?.lastModified)
+      headers["If-Modified-Since"] = meta.lastModified;
 
     const r = await fetch(u, { headers });
     if (r.status === 304) continue;
@@ -215,14 +248,22 @@ export async function syncDocs() {
 ```
 
 ### `lib/md.ts`
+
 ```ts
-export function splitMarkdownToChunks(md: string, maxTokens = 800, overlap = 120) {
+export function splitMarkdownToChunks(
+  md: string,
+  maxTokens = 800,
+  overlap = 120
+) {
   const sections = md.split(/\n(?=#{1,6}\s)/g);
   const chunks: string[] = [];
   for (const sec of sections) {
     const words = sec.split(/\s+/);
     for (let i = 0; i < words.length; i += Math.max(1, maxTokens - overlap)) {
-      const part = words.slice(i, i + maxTokens).join(" ").trim();
+      const part = words
+        .slice(i, i + maxTokens)
+        .join(" ")
+        .trim();
       if (part) chunks.push(part);
     }
   }
@@ -231,6 +272,7 @@ export function splitMarkdownToChunks(md: string, maxTokens = 800, overlap = 120
 ```
 
 ### `lib/localEmbeddings.ts`
+
 ```ts
 import { pipeline } from "@xenova/transformers";
 
@@ -247,11 +289,12 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
   const model = await getExtractor();
   const out = await model(texts, { pooling: "mean", normalize: true });
   const arr = Array.isArray(out.data) ? out.data : Array.from(out.data);
-  return Array.isArray(arr[0]) ? arr as number[][] : [arr as number[]];
+  return Array.isArray(arr[0]) ? (arr as number[][]) : [arr as number[]];
 }
 ```
 
 ### `lib/ingest.ts`
+
 ```ts
 import fs from "fs/promises";
 import path from "path";
@@ -281,16 +324,32 @@ export async function ingestAllMarkdown() {
     const vectors = await embedTexts(chunks);
 
     vectors.forEach((v, i) => {
-      all.push({ id: `${rel}#${i}`, file: rel, idx: i, content: chunks[i], vector: v });
+      all.push({
+        id: `${rel}#${i}`,
+        file: rel,
+        idx: i,
+        content: chunks[i],
+        vector: v,
+      });
     });
   }
 
-  await fs.writeFile(INDEX_PATH, JSON.stringify({ items: all }, null, 2), "utf8");
-  return { ok: true, files: files.length, chunks: all.length, indexPath: INDEX_PATH };
+  await fs.writeFile(
+    INDEX_PATH,
+    JSON.stringify({ items: all }, null, 2),
+    "utf8"
+  );
+  return {
+    ok: true,
+    files: files.length,
+    chunks: all.length,
+    indexPath: INDEX_PATH,
+  };
 }
 ```
 
 ### `lib/search.ts`
+
 ```ts
 import { head } from "@vercel/blob";
 import fs from "fs/promises";
@@ -299,7 +358,13 @@ import path from "path";
 const DOCS_DIR = process.env.DOCS_DIR ?? "./docs";
 const INDEX_PATH = path.join(DOCS_DIR, "index.json");
 
-export type IndexItem = { id: string; file: string; idx: number; content: string; vector: number[] };
+export type IndexItem = {
+  id: string;
+  file: string;
+  idx: number;
+  content: string;
+  vector: number[];
+};
 let _cache: { items: IndexItem[] } | null = null;
 
 function normalizeText(text: string) {
@@ -314,10 +379,14 @@ export async function loadIndex() {
 
   let raw: string;
   if (process.env.VERCEL_ENV) {
-    const blob = await head("index.json", { token: process.env.BLOB_READ_WRITE_TOKEN });
+    const blob = await head("index.json", {
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+    });
     const response = await fetch(blob.url);
     if (!response.ok) {
-      throw new Error(`Failed to download index.json from blob storage. Status: ${response.status}`);
+      throw new Error(
+        `Failed to download index.json from blob storage. Status: ${response.status}`
+      );
     }
     raw = await response.text();
   } else {
@@ -333,22 +402,28 @@ export function resetIndexCache() {
 }
 
 export function topK(qvec: number[], items: IndexItem[], k = 6) {
-  const dot = (a: number[], b: number[]) => a.reduce((s, x, i) => s + x * b[i], 0);
+  const dot = (a: number[], b: number[]) =>
+    a.reduce((s, x, i) => s + x * b[i], 0);
   return items
-    .map(it => ({ it, score: dot(qvec, it.vector) }))
-    .sort((a,b)=>b.score - a.score)
+    .map((it) => ({ it, score: dot(qvec, it.vector) }))
+    .sort((a, b) => b.score - a.score)
     .slice(0, k)
-    .map(s => ({ ...s.it, score: s.score }));
+    .map((s) => ({ ...s.it, score: s.score }));
 }
 
 export function keywordSearch(query: string, items: IndexItem[], limit = 3) {
-  const tokens = normalizeText(query).split(/\s+/).filter((tok) => tok.length > 2);
+  const tokens = normalizeText(query)
+    .split(/\s+/)
+    .filter((tok) => tok.length > 2);
   if (!tokens.length) return [];
 
   return items
     .map((it) => {
       const text = normalizeText(`${it.file}\n${it.content}`);
-      const hits = tokens.reduce((count, token) => count + (text.includes(token) ? 1 : 0), 0);
+      const hits = tokens.reduce(
+        (count, token) => count + (text.includes(token) ? 1 : 0),
+        0
+      );
       const coverage = hits / tokens.length;
       return coverage > 0 ? { ...it, score: coverage } : null;
     })
@@ -361,6 +436,7 @@ export function keywordSearch(query: string, items: IndexItem[], limit = 3) {
 ## 🌐 API trasy
 
 ### `app/api/admin/sync/route.ts`
+
 ```ts
 import { NextRequest, NextResponse } from "next/server";
 import { syncDocs } from "@/lib/sync";
@@ -375,6 +451,7 @@ export async function POST(req: NextRequest) {
 ```
 
 ### `app/api/admin/reindex/route.ts`
+
 ```ts
 import { NextRequest, NextResponse } from "next/server";
 import { ingestAllMarkdown } from "@/lib/ingest";
@@ -395,6 +472,7 @@ export async function POST(req: NextRequest) {
 ```
 
 ### `app/api/ask/route.ts`
+
 ```ts
 import { NextRequest, NextResponse } from "next/server";
 import { loadIndex, topK, keywordSearch } from "@/lib/search";
@@ -472,46 +550,56 @@ export async function POST(req: NextRequest) {
 ```
 
 ## 🖥️ Volitelné UI (`app/page.tsx`)
+
 ```tsx
 "use client";
 import { useState } from "react";
 
 export default function Page() {
   const [q, setQ] = useState("");
-  const [msgs, setMsgs] = useState<{q:string,a:string,c:any[]}[]>([]);
+  const [msgs, setMsgs] = useState<{ q: string; a: string; c: any[] }[]>([]);
 
   async function ask() {
     const r = await fetch("/api/ask", {
       method: "POST",
-      headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({ query: q, localOnly: true })
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: q, localOnly: true }),
     });
     const data = await r.json();
-    setMsgs(m => [...m, { q, a: data.answer, c: data.citations }]);
+    setMsgs((m) => [...m, { q, a: data.answer, c: data.citations }]);
     setQ("");
   }
 
   return (
-    <main style={{maxWidth:800, margin:"40px auto", fontFamily:"system-ui"}}>
+    <main
+      style={{ maxWidth: 800, margin: "40px auto", fontFamily: "system-ui" }}
+    >
       <h1>Local Docs Chat</h1>
-      <div style={{display:"flex", gap:8}}>
+      <div style={{ display: "flex", gap: 8 }}>
         <input
           value={q}
-          onChange={e=>setQ(e.target.value)}
-          onKeyDown={e=>e.key==="Enter" && ask()}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && ask()}
           placeholder="Ask your docs..."
-          style={{flex:1, padding:10, border:"1px solid #ccc"}}
+          style={{ flex: 1, padding: 10, border: "1px solid #ccc" }}
         />
         <button onClick={ask}>Ask</button>
       </div>
-      <div style={{marginTop:24}}>
-        {msgs.map((m,i)=>(
-          <div key={i} style={{border:"1px solid #eee", padding:12, margin:"12px 0"}}>
-            <div><strong>You:</strong> {m.q}</div>
-            <div style={{whiteSpace:"pre-wrap", marginTop:8}}><strong>Answer:</strong> {m.a}</div>
+      <div style={{ marginTop: 24 }}>
+        {msgs.map((m, i) => (
+          <div
+            key={i}
+            style={{ border: "1px solid #eee", padding: 12, margin: "12px 0" }}
+          >
+            <div>
+              <strong>You:</strong> {m.q}
+            </div>
+            <div style={{ whiteSpace: "pre-wrap", marginTop: 8 }}>
+              <strong>Answer:</strong> {m.a}
+            </div>
             {m.c?.length ? (
-              <div style={{fontSize:14, color:"#555", marginTop:8}}>
-                Sources: {m.c.map((c:any)=>`[#${c.id} ${c.file}]`).join(" ")}
+              <div style={{ fontSize: 14, color: "#555", marginTop: 8 }}>
+                Sources: {m.c.map((c: any) => `[#${c.id} ${c.file}]`).join(" ")}
               </div>
             ) : null}
           </div>
@@ -523,22 +611,27 @@ export default function Page() {
 ```
 
 ## ▶️ Spuštění
+
 ```bash
 npm run dev
 ```
 
 Synchronizace dokumentace:
+
 ```bash
 curl -X POST -H "x-admin-key: $ADMIN_KEY" http://localhost:3000/api/admin/sync
 ```
 
 Reindex (volitelně i se sync):
+
 ```bash
 curl -X POST -H "x-admin-key: $ADMIN_KEY" "http://localhost:3000/api/admin/reindex?sync=1"
 ```
+
 Po reindexaci se cache v paměti automaticky invaliduje, takže další dotazy hned čtou nový `index.json`.
 
 Dotaz:
+
 ```bash
 curl -X POST http://localhost:3000/api/ask \
   -H "Content-Type: application/json" \
@@ -546,6 +639,7 @@ curl -X POST http://localhost:3000/api/ask \
 ```
 
 ## 🧱 Volitelně: Lokální LLM přes Ollamu
+
 1. Nainstaluj Ollamu (macOS/Linux/Win): https://ollama.com
 2. Stáhni model:
    ```bash
@@ -557,40 +651,47 @@ curl -X POST http://localhost:3000/api/ask \
 `/api/ask` použije Ollamu, pokud `localOnly: true` (výchozí).
 
 ## 🔁 Hybridní režim (lokálně + cloud)
+
 - Embeddingy zůstávají lokální.
 - Generování může spadnout do cloudu (levný model) jen když je potřeba.
 - Pošli `localOnly: false` v těle `/api/ask`, případně využij prah hodnoty relevance (`maxScore`).
 - Cena je na malém provozu v řádu centů za měsíc.
 
 ## 🔒 Bezpečnost
+
 - Admin trasy chraň přes `x-admin-key` + ideálně IP whitelist v reverzní proxy (Caddy/Nginx).
 - Složku `docs/` měj na perzistentním disku (je v `.gitignore`).
 
 ## 🛠️ Nasazení
+
 - Server s Node 20+ za HTTPS proxy (Caddy/Nginx).
 - Dbej na to, aby `docs/` přežila redeploy (volume/bind mount).
 - Systemd (volitelné): `npm run build && npm start` pod službou.
 - První běh embeddingu stáhne model `@xenova/transformers` (počítej s tím).
 
 ## 🧪 Odstraňování potíží
+
 - **Žádné markdowny**: přidej manifest `<tvůj_koren>/index.json` pro každý z kořenů v `DOCS_BASE_URLS`.
 - **První reindex je pomalý**: stahuje se model, pak už to běží rychle.
 - **Halucinace**: sniž `k` (třeba na 4), zpřísni systémový prompt, kontroluj dělení na bloky.
 - **Lokální LLM je pomalé**: zvol menší model (např. `mistral:7b`) nebo hybridní režim.
 
 ## 📏 Dimenzování
+
 - ~20 stran A4 (~12–16k tokenů) → po rozdělení vyjde 20–40 chunků.
 - Lokální hledání je okamžité, index má stovky kB, nepotřebuješ externí vektorovou DB.
 
 ## 🔄 Vylepšení a změny
 
 ### Vylepšené dělení textu (2024-11)
+
 - ✅ **Lepší zpracování dokumentů bez headingů**: Funkce `splitMarkdownToChunks` nyní automaticky rozděluje dokumenty podle prázdných řádků, pokud nemají markdown headingy
 - ✅ **Menší chunky pro přesnější vyhledávání**: Výchozí velikost chunků snížena z 800 na 300 tokenů pro lepší granularitu
 - ✅ **Opravené embedování v batch**: Funkce `embedTexts` nyní správně zpracovává více textů najednou (dříve vrátila jen 1 vektor pro všechny texty)
 - ✅ **Pomocný skript**: Přidán `scripts/reindex-docs.ts` pro snadnou reindexaci dokumentů
 
 ### Jak reindexovat dokumenty
+
 ```bash
 # Pomocí skriptu (doporučeno)
 npx tsx scripts/reindex-docs.ts
@@ -600,6 +701,7 @@ curl -X POST -H "x-admin-key: $ADMIN_KEY" "http://localhost:3000/api/admin/reind
 ```
 
 ## ✅ Co má agent udělat
+
 - Vytvořit soubory podle README.
 - Nainstalovat závislosti a nastavit `.env.local`.
 - Implementovat endpointy a knihovny.
