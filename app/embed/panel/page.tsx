@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { Suspense, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import { useSearchParams } from "next/navigation";
 import remarkGfm from "remark-gfm";
@@ -9,6 +9,60 @@ import { useChatController } from "../../components/useChatController";
 const FALLBACK_ACCENT = "#ff6200";
 
 export default function WidgetPanelPage() {
+  return (
+    <Suspense fallback={<PanelFallback />}>
+      <WidgetPanelInner />
+    </Suspense>
+  );
+}
+
+function PanelFallback() {
+  return (
+    <div className="widget-shell">
+      <div className="widget-head skeleton" />
+      <div className="widget-thread skeleton" />
+      <style jsx>{`
+        :global(body) {
+          margin: 0;
+          font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont,
+            "Segoe UI", sans-serif;
+          background: #050608;
+        }
+        .widget-shell {
+          min-height: 100vh;
+          padding: 20px;
+          background: linear-gradient(180deg, #111624, #050608);
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+        .skeleton {
+          border-radius: 18px;
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          min-height: 120px;
+          animation: pulse 1.4s ease-in-out infinite;
+        }
+        .widget-head.skeleton {
+          min-height: 96px;
+        }
+        @keyframes pulse {
+          0% {
+            opacity: 0.5;
+          }
+          50% {
+            opacity: 0.9;
+          }
+          100% {
+            opacity: 0.5;
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function WidgetPanelInner() {
   const searchParams = useSearchParams();
   const accent = searchParams.get("accent") ?? FALLBACK_ACCENT;
   const title = searchParams.get("title") ?? "eSports Chatbot";
