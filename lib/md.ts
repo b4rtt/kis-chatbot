@@ -1,10 +1,19 @@
-export function splitMarkdownToChunks(md: string, maxTokens = 300, overlap = 50) {
-  // Nejdříve zkusíme rozdělit podle headingů
-  let sections = md.split(/\n(?=#{1,6}\s)/g);
+export function splitMarkdownToChunks(md: string) {
+  // Detekujeme, jestli má dokument markdown headingy
+  const hasHeadings = /\n#{1,6}\s/.test(md);
   
-  // Pokud nejsou žádné headingy, rozdělíme podle otázek nebo prázdných řádků
-  if (sections.length === 1) {
-    // Rozdělíme na odstavce (prázdné řádky)
+  // Pro dokumenty s headingy použijeme větší chunky (headingy poskytují kontext)
+  // Pro prosté textové dokumenty menší chunky pro větší granularitu
+  const maxTokens = hasHeadings ? 800 : 300;
+  const overlap = hasHeadings ? 120 : 50;
+  
+  let sections: string[];
+  
+  if (hasHeadings) {
+    // Rozdělíme podle headingů
+    sections = md.split(/\n(?=#{1,6}\s)/g);
+  } else {
+    // Pro prosté textové dokumenty rozdělíme podle odstavců
     sections = md.split(/\n\s*\n/g);
   }
   

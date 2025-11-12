@@ -250,15 +250,32 @@ export async function syncDocs() {
 ### `lib/md.ts`
 
 ```ts
-export function splitMarkdownToChunks(
-  md: string,
-  maxTokens = 800,
-  overlap = 120
-) {
-  const sections = md.split(/\n(?=#{1,6}\s)/g);
+export function splitMarkdownToChunks(md: string) {
+  // Automaticky detekuje typ dokumentu
+  const hasHeadings = /\n#{1,6}\s/.test(md);
+
+  // Pro MD s headingy: větší chunky (800 tokenů), headingy dávají kontext
+  // Pro prostý text: menší chunky (300 tokenů) pro lepší granularitu
+  const maxTokens = hasHeadings ? 800 : 300;
+  const overlap = hasHeadings ? 120 : 50;
+
+  // Rozdělení podle typu dokumentu
+  const sections = hasHeadings
+    ? md.split(/\n(?=#{1,6}\s)/g) // podle headingů
+    : md.split(/\n\s*\n/g); // podle odstavců
+
   const chunks: string[] = [];
   for (const sec of sections) {
-    const words = sec.split(/\s+/);
+    const trimmed = sec.trim();
+    if (!trimmed) continue;
+
+    const words = trimmed.split(/\s+/);
+    if (words.length <= maxTokens) {
+      chunks.push(trimmed);
+      continue;
+    }
+
+    // Delší sekce rozdělíme s překryvem
     for (let i = 0; i < words.length; i += Math.max(1, maxTokens - overlap)) {
       const part = words
         .slice(i, i + maxTokens)
@@ -267,7 +284,7 @@ export function splitMarkdownToChunks(
       if (part) chunks.push(part);
     }
   }
-  return chunks;
+  return chunks.filter((c) => c.length > 0);
 }
 ```
 
@@ -685,8 +702,10 @@ curl -X POST http://localhost:3000/api/ask \
 
 ### Vylepšené dělení textu (2024-11)
 
-- ✅ **Lepší zpracování dokumentů bez headingů**: Funkce `splitMarkdownToChunks` nyní automaticky rozděluje dokumenty podle prázdných řádků, pokud nemají markdown headingy
-- ✅ **Menší chunky pro přesnější vyhledávání**: Výchozí velikost chunků snížena z 800 na 300 tokenů pro lepší granularitu
+- ✅ **Adaptivní zpracování dokumentů**: Funkce `splitMarkdownToChunks` automaticky detekuje typ dokumentu:
+  - **Markdown s headingy**: Větší chunky (800 tokenů), protože headingy poskytují strukturu a kontext
+  - **Prostý text**: Menší chunky (300 tokenů) pro lepší granularitu, rozdělení podle odstavců
+- ✅ **Univerzální kompatibilita**: Funguje s klasickými MD soubory i prostými textovými soubory bez formátování
 - ✅ **Opravené embedování v batch**: Funkce `embedTexts` nyní správně zpracovává více textů najednou (dříve vrátila jen 1 vektor pro všechny texty)
 - ✅ **Pomocný skript**: Přidán `scripts/reindex-docs.ts` pro snadnou reindexaci dokumentů
 
