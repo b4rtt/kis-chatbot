@@ -53,6 +53,7 @@ export async function ingestAllMarkdown() {
     await put("index.json", indexJson, {
       access: "public",
       token: process.env.BLOB_READ_WRITE_TOKEN,
+      allowOverwrite: true, // Allow overwriting existing index.json when reindexing
     });
     return { ok: true, files: files.length, chunks: all.length, indexPath: "index.json (Vercel Blob)" };
   } else {
