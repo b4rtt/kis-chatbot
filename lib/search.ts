@@ -1,4 +1,4 @@
-import { get } from "@vercel/blob";
+import { head } from "@vercel/blob";
 import fs from "fs/promises";
 import path from "path";
 
@@ -15,7 +15,7 @@ export async function loadIndex() {
   // Use Vercel Blob in production, otherwise use local filesystem
   if (process.env.VERCEL_ENV) {
     try {
-      const blob = await get("index.json", {
+      const blob = await head("index.json", {
         token: process.env.BLOB_READ_WRITE_TOKEN,
       });
       const response = await fetch(blob.url);
