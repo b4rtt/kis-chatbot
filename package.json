@@ -1,0 +1,29 @@
+{
+  "name": "esports-bot",
+  "version": "1.0.0",
+  "description": "Local Docs Chatbot — Next.js + Local Embeddings (+ optional Local LLM) A fully local documentation chatbot you can run on your own server or laptop. It fetches Markdown docs from a public HTTPS site, builds local embeddings (no Pinecone), and answers questions strictly from your docs. Optionally, you can run generation via a local LLM (Ollama). If you prefer a hybrid, you can keep embeddings local and call a cheap cloud model for generation.",
+  "main": "index.js",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@types/node": "^20.11.24",
+    "@types/react": "^18.2.61",
+    "@types/react-dom": "^18.2.19",
+    "@xenova/transformers": "^2.17.2",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "14.2.4",
+    "next": "14.2.4",
+    "openai": "^6.8.1",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "typescript": "^5.3.3"
+  }
+}
