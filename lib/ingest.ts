@@ -4,7 +4,10 @@ import { splitMarkdownToChunks } from "./md";
 import { embedTexts } from "./localEmbeddings";
 import { put } from "@vercel/blob";
 
-const DOCS_DIR = process.env.DOCS_DIR ?? "./docs";
+// Use /tmp on Vercel (read-only filesystem except /tmp)
+const DOCS_DIR = process.env.VERCEL_ENV 
+  ? "/tmp/docs" 
+  : (process.env.DOCS_DIR ?? "./docs");
 const INDEX_PATH = path.join(DOCS_DIR, "index.json");
 
 export async function ingestAllMarkdown() {

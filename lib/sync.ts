@@ -2,7 +2,10 @@ import fs from "fs/promises";
 import path from "path";
 import { listMarkdownUrls } from "./crawler";
 
-const DOCS_DIR = process.env.DOCS_DIR ?? "./docs";
+// Use /tmp on Vercel (read-only filesystem except /tmp)
+const DOCS_DIR = process.env.VERCEL_ENV 
+  ? "/tmp/docs" 
+  : (process.env.DOCS_DIR ?? "./docs");
 const CACHE_FILE = path.join(DOCS_DIR, ".cache.json");
 
 type Cache = Record<string, { etag?: string; lastModified?: string }>;
