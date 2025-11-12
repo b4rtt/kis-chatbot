@@ -582,6 +582,23 @@ curl -X POST http://localhost:3000/api/ask \
 - ~20 stran A4 (~12–16k tokenů) → po rozdělení vyjde 20–40 chunků.
 - Lokální hledání je okamžité, index má stovky kB, nepotřebuješ externí vektorovou DB.
 
+## 🔄 Vylepšení a změny
+
+### Vylepšené dělení textu (2024-11)
+- ✅ **Lepší zpracování dokumentů bez headingů**: Funkce `splitMarkdownToChunks` nyní automaticky rozděluje dokumenty podle prázdných řádků, pokud nemají markdown headingy
+- ✅ **Menší chunky pro přesnější vyhledávání**: Výchozí velikost chunků snížena z 800 na 300 tokenů pro lepší granularitu
+- ✅ **Opravené embedování v batch**: Funkce `embedTexts` nyní správně zpracovává více textů najednou (dříve vrátila jen 1 vektor pro všechny texty)
+- ✅ **Pomocný skript**: Přidán `scripts/reindex-docs.ts` pro snadnou reindexaci dokumentů
+
+### Jak reindexovat dokumenty
+```bash
+# Pomocí skriptu (doporučeno)
+npx tsx scripts/reindex-docs.ts
+
+# Nebo pomocí API
+curl -X POST -H "x-admin-key: $ADMIN_KEY" "http://localhost:3000/api/admin/reindex"
+```
+
 ## ✅ Co má agent udělat
 - Vytvořit soubory podle README.
 - Nainstalovat závislosti a nastavit `.env.local`.

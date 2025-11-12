@@ -19,8 +19,25 @@ async function getExtractor() {
 
 // mean pooling + normalize => cosine = dot product
 export async function embedTexts(texts: string[]): Promise<number[][]> {
-const model = await getExtractor();
-const out = await model(texts, { pooling: "mean", normalize: true });
-const arr = Array.isArray(out.data) ? out.data : Array.from(out.data);
-return Array.isArray(arr[0]) ? arr as number[][] : [arr as number[]];
+  const model = await getExtractor();
+  const out = await model(texts, { pooling: "mean", normalize: true });
+  
+  // Model returns flat array with dims [batch_size, vector_size]
+  const data = Array.isArray(out.data) ? out.data : Array.from(out.data);
+  
+  // Check if we have dimensions info
+  if (out.dims && out.dims.length === 2) {
+    const [batchSize, vectorSize] = out.dims;
+    const vectors: number[][] = [];
+    
+    // Reshape flat array into 2D array
+    for (let i = 0; i < batchSize; i++) {
+      vectors.push(data.slice(i * vectorSize, (i + 1) * vectorSize));
+    }
+    
+    return vectors;
+  }
+  
+  // Fallback for single vector or already 2D array
+  return Array.isArray(data[0]) ? data as number[][] : [data as number[]];
 }
