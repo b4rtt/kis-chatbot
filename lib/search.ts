@@ -1,4 +1,4 @@
-import { list } from "@vercel/blob";
+import { get } from "@vercel/blob";
 import fs from "fs/promises";
 import path from "path";
 
@@ -14,22 +14,21 @@ export async function loadIndex() {
   let raw: string;
   // Use Vercel Blob in production, otherwise use local filesystem
   if (process.env.VERCEL_ENV) {
-    const blob = await list({
-      prefix: "index.json",
-      limit: 1,
-      token: process.env.BLOB_READ_WRITE_TOKEN,
-    });
-
-    if (blob.blobs.length === 0) {
-      throw new Error("index.json not found in Vercel Blob storage. Please run the reindexing process.");
+    try {
+      const blob = await get("index.json", {
+        token: process.env.BLOB_READ_WRITE_TOKEN,
+      });
+      const response = await fetch(blob.url);
+      if (!response.ok) {
+        throw new Error(`Failed to download index.json from blob storage. Status: ${response.status}`);
+      }
+      raw = await response.text();
+    } catch (error) {
+      if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string' && error.message.includes('not found')) {
+        throw new Error("index.json not found in Vercel Blob storage. Please run the reindexing process.");
+      }
+      throw error;
     }
-
-    const indexUrl = blob.blobs[0].url;
-    const response = await fetch(indexUrl);
-    if (!response.ok) {
-      throw new Error(`Failed to download index.json from blob storage. Status: ${response.status}`);
-    }
-    raw = await response.text();
   } else {
     raw = await fs.readFile(INDEX_PATH, "utf8");
   }
