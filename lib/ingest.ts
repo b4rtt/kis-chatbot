@@ -18,7 +18,7 @@ export async function ingestAllMarkdown() {
         else if (e.isFile() && e.name.endsWith(".md")) files.push(p);
       }
     } catch (error) {
-      if (error.code === 'ENOENT') {
+      if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
         console.log(`Directory not found: ${dir}, skipping walk.`);
         return;
       }
