@@ -54,7 +54,7 @@ export default function Page() {
       });
       if (!r.ok) {
         const err = await r.json().catch(() => ({}));
-        throw new Error(err.error || "Dotaz selhal. Zkus to prosim znovu.");
+        throw new Error(err.error || "Dotaz selhal. Zkus to prosím znovu.");
       }
       const data = await r.json();
       setMsgs((m) => [
@@ -68,7 +68,7 @@ export default function Page() {
       ]);
       setQ("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Neco se pokazilo.");
+      setError(err instanceof Error ? err.message : "Něco se pokazilo.");
     } finally {
       setLoading(false);
     }
@@ -79,19 +79,19 @@ export default function Page() {
       <div className="shell">
         <header className="hero">
           <div>
-            <h1>KIS Chatbot</h1>
+            <h1>eSports Chatbot</h1>
             <p className="lede">
-              Pridavas dotazy, my kombinujeme lokalni index a OpenAI. Vse pod
-              kontrolou, vcetne nakladu.
+              Přidáváš dotazy, my kombinujeme lokální index a OpenAI. Vše pod
+              kontrolou, včetně nákladů.
             </p>
           </div>
           <div className="metrics">
             <div className="metric">
-              <span className="label">Naklady (USD)</span>
+              <span className="label">Náklady (USD)</span>
               <span className="value">${formatUsd(totalUsd)}</span>
             </div>
             <div className="metric">
-              <span className="label">Pocet dotazu</span>
+              <span className="label">Počet dotazů</span>
               <span className="value">{msgs.length}</span>
             </div>
             <div className="metric">
@@ -106,10 +106,10 @@ export default function Page() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && ask()}
-            placeholder="Zeptej se na dokumentaci..."
+            placeholder="Zeptej se na dokumentaci…"
           />
           <button onClick={ask} disabled={loading}>
-            {loading ? "Probiha..." : "Zeptat se"}
+            {loading ? "Probíhá…" : "Zeptat se"}
           </button>
         </section>
         {error ? <p className="error">{error}</p> : null}
@@ -117,10 +117,10 @@ export default function Page() {
         <section className="thread">
           {msgs.length === 0 ? (
             <div className="placeholder">
-              <h3>Pripraveni?</h3>
+              <h3>Připraveni?</h3>
               <p>
-                Vloz dotaz a sleduj, jak se odpoved slozi z lokalnich dokumentu.
-                Kliknutim na zdroje kdykoliv zjistis, odkud informace pochazi.
+                Vlož dotaz a sleduj, jak se odpověď složí z lokálních dokumentů.
+                Kliknutím na zdroje kdykoliv zjistíš, odkud informace pochází.
               </p>
             </div>
           ) : (
@@ -136,7 +136,7 @@ export default function Page() {
                 </div>
                 <div className="meta">
                   <div>
-                    <span>Naklady: ${formatUsd(m.cost?.usd ?? 0)}</span>
+                    <span>Náklady: ${formatUsd(m.cost?.usd ?? 0)}</span>
                     <span>Tokeny: {m.cost?.tokens.total ?? 0}</span>
                   </div>
                   {m.c?.length ? (
@@ -172,7 +172,7 @@ export default function Page() {
               <button
                 className="close"
                 onClick={() => setOpenSources(null)}
-                aria-label="Zavrit modal se zdroji"
+                aria-label="Zavřít modal se zdroji"
               >
                 x
               </button>

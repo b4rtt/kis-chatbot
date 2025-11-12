@@ -6,13 +6,14 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 const INPUT_PRICE = Number(process.env.OPENAI_INPUT_PRICE_PER_1K ?? "0.00015");
 const OUTPUT_PRICE = Number(process.env.OPENAI_OUTPUT_PRICE_PER_1K ?? "0.0006");
-const CONTACT_MESSAGE = `Na tuto otázku bohužel nemám odpoveď.
+const CONTACT_MESSAGE = `Na tuto otázku bohužel nemáme odpověď.
 
 --------------------------------
+Kontakt
 Nevíte si rady? Máte dotaz?
 
 Než nás kontaktujete, doporučujeme navštívit stránku Časté dotazy (https://kis.esportsmedia.com/caste-dotazy), kde najdete odpovědi na nejčastější otázky.
-Pokud odpověď nenajdete, náš tým technické podpory je vám k dispozici každý den, včetně víkendu, od 8:00 do 20:00
+Pokud odpověď nenajdete, náš tým technické podpory je vám k dispozici každý den, včetně víkendů, od 8:00 do 20:00.
 
 Technická podpora (Denně 8 - 20)
 
@@ -47,7 +48,13 @@ function formatAnswer(answer: string) {
   const text = answer?.trim() ?? "";
   if (!text) return CONTACT_MESSAGE;
   const normalized = text.toLowerCase();
-  if (normalized.includes("not in the docs") || normalized.includes("not in docs")) {
+  const triggers = [
+    "not in the docs",
+    "not in docs",
+    "neni v dokumentaci",
+    "není v dokumentaci",
+  ];
+  if (triggers.some((phrase) => normalized.includes(phrase))) {
     return CONTACT_MESSAGE;
   }
   return answer;
@@ -69,7 +76,7 @@ return data.response as string;
 
 export async function POST(req: NextRequest) {
 const { query, k = 6, localOnly = true } = await req.json();
-if (!query) return NextResponse.json({ error: "Missing query" }, { status: 400 });
+if (!query) return NextResponse.json({ error: "Chybí dotaz" }, { status: 400 });
 
 // Local query embedding
 const { embedTexts } = await import("@/lib/localEmbeddings");
@@ -88,7 +95,7 @@ if (!passages.length) {
 }
 const context = passages.map((p,i)=>`[#${i+1}] ${p.file}\n---\n${p.content}`).join("\n\n");
 
-const sys = "You answer ONLY from the provided context. If info is missing, say 'Not in the docs.' Be concise and end with [#] citations.";
+const sys = "Odpovídej pouze z dodaného kontextu. Když informace chybí, řekni 'Není v dokumentaci.' Buď stručný a odpověď zakonči citacemi ve formátu [#].";
 const prompt = `${sys}\n\nQuestion: ${query}\n\nContext:\n${context}`;
 
 // Confidence threshold (optional)
