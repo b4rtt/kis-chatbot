@@ -1,4 +1,5 @@
-const widgetSource = String.raw`(() => {
+(() => {
+  if (typeof window === "undefined") return;
   const FLAG = "__ESPORTS_CHAT_WIDGET__";
   if (window[FLAG]) return;
   window[FLAG] = true;
@@ -74,9 +75,9 @@ const widgetSource = String.raw`(() => {
 
     const panelWrapper = document.createElement("div");
     panelWrapper.style.width = width;
-    panelWrapper.style.maxWidth = "min(100vw - 32px, " + width + ")";
+    panelWrapper.style.maxWidth = `min(100vw - 32px, ${width})`;
     panelWrapper.style.height = height;
-    panelWrapper.style.maxHeight = "min(90vh, " + height + ")";
+    panelWrapper.style.maxHeight = `min(90vh, ${height})`;
     panelWrapper.style.borderRadius = radius;
     panelWrapper.style.boxShadow = shadow;
     panelWrapper.style.overflow = "hidden";
@@ -94,13 +95,12 @@ const widgetSource = String.raw`(() => {
     const iframe = document.createElement("iframe");
     iframe.src = iframeSrc;
     iframe.id = iframeId;
-    iframe.setAttribute("title", dataset.iframeTitle || "Chatbot");
+    iframe.title = dataset.iframeTitle || "Chatbot";
     iframe.setAttribute("role", "document");
     iframe.style.width = "100%";
     iframe.style.height = "100%";
     iframe.style.border = "0";
     iframe.style.background = "transparent";
-    iframe.style.opacity = "1";
 
     panelWrapper.appendChild(iframe);
 
@@ -194,13 +194,4 @@ const widgetSource = String.raw`(() => {
   } else {
     init();
   }
-})();`;
-
-export function GET() {
-  return new Response(widgetSource, {
-    headers: {
-      "Content-Type": "application/javascript; charset=utf-8",
-      "Cache-Control": "public, max-age=300, must-revalidate",
-    },
-  });
-}
+})();
