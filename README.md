@@ -339,6 +339,7 @@ export async function POST(req: NextRequest) {
 import { NextRequest, NextResponse } from "next/server";
 import { ingestAllMarkdown } from "@/lib/ingest";
 import { syncDocs } from "@/lib/sync";
+import { resetIndexCache } from "@/lib/search";
 
 export async function POST(req: NextRequest) {
   if (req.headers.get("x-admin-key") !== process.env.ADMIN_KEY)
@@ -348,6 +349,7 @@ export async function POST(req: NextRequest) {
   if (doSync) await syncDocs();
 
   const res = await ingestAllMarkdown();
+  resetIndexCache();
   return NextResponse.json(res);
 }
 ```
@@ -484,6 +486,7 @@ Reindex (volitelně i se sync):
 ```bash
 curl -X POST -H "x-admin-key: $ADMIN_KEY" "http://localhost:3000/api/admin/reindex?sync=1"
 ```
+Po reindexaci se cache v paměti automaticky invaliduje, takže další dotazy hned čtou nový `index.json`.
 
 Dotaz:
 ```bash

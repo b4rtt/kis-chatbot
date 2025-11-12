@@ -37,6 +37,10 @@ export async function loadIndex() {
   return _cache;
 }
 
+export function resetIndexCache() {
+  _cache = null;
+}
+
 export function topK(qvec: number[], items: IndexItem[], k = 6) {
   const dot = (a: number[], b: number[]) => a.reduce((s, x, i) => s + x * b[i], 0);
   return items

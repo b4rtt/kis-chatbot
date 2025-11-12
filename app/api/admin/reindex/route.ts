@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ingestAllMarkdown } from "@/lib/ingest";
 import { syncDocs } from "@/lib/sync";
+import { resetIndexCache } from "@/lib/search";
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,6 +20,7 @@ export async function POST(req: NextRequest) {
     console.log("Starting ingestion...");
     const res = await ingestAllMarkdown();
     console.log("Ingestion completed:", res);
+    resetIndexCache();
     
     return NextResponse.json(res);
   } catch (error) {
