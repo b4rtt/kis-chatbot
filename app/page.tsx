@@ -58,13 +58,13 @@ export default function Page() {
       }
       const data = await r.json();
       setMsgs((m) => [
-        ...m,
         {
           q,
           a: data.answer ?? "",
           c: data.citations ?? [],
           cost: data.cost ?? emptyCost,
         },
+        ...m,
       ]);
       setQ("");
     } catch (err) {

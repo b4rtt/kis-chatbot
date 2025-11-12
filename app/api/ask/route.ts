@@ -6,6 +6,20 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 const INPUT_PRICE = Number(process.env.OPENAI_INPUT_PRICE_PER_1K ?? "0.00015");
 const OUTPUT_PRICE = Number(process.env.OPENAI_OUTPUT_PRICE_PER_1K ?? "0.0006");
+const CONTACT_MESSAGE = `Na tuto otázku bohužel nemám odpoveď.
+
+--------------------------------
+Nevíte si rady? Máte dotaz?
+
+Než nás kontaktujete, doporučujeme navštívit stránku Časté dotazy (https://kis.esportsmedia.com/caste-dotazy), kde najdete odpovědi na nejčastější otázky.
+Pokud odpověď nenajdete, náš tým technické podpory je vám k dispozici každý den, včetně víkendu, od 8:00 do 20:00
+
+Technická podpora (Denně 8 - 20)
+
++420 777 044 960
+Napište nám
+
+kis@esportsmedia.cz`;
 
 type UsageSummary = {
   prompt_tokens?: number;
@@ -27,6 +41,16 @@ function summarizeCost(usage?: UsageSummary) {
     usd,
     tokens: { prompt, completion, total },
   };
+}
+
+function formatAnswer(answer: string) {
+  const text = answer?.trim() ?? "";
+  if (!text) return CONTACT_MESSAGE;
+  const normalized = text.toLowerCase();
+  if (normalized.includes("not in the docs") || normalized.includes("not in docs")) {
+    return CONTACT_MESSAGE;
+  }
+  return answer;
 }
 
 async function generateLocal(prompt: string) {
@@ -72,8 +96,10 @@ if (maxScore < 0.28 && !localOnly && process.env.OPENAI_API_KEY) {
     ],
   });
   const cost = summarizeCost(chat.usage ?? undefined);
+  const rawAnswer = chat.choices[0].message.content ?? "";
+  const answer = formatAnswer(rawAnswer);
   return NextResponse.json({
-    answer: chat.choices[0].message.content,
+    answer,
     citations: passages.map((p,i)=>({ id:i+1, file:p.file, idx:p.idx, score:p.score })),
     cost,
   });
@@ -83,7 +109,7 @@ if (maxScore < 0.28 && !localOnly && process.env.OPENAI_API_KEY) {
 let answer: string;
 let cost = zeroCost;
 if (localOnly) {
-  answer = await generateLocal(prompt);
+  answer = formatAnswer(await generateLocal(prompt));
 } else {
   const chat = await openai.chat.completions.create({
     model: OPENAI_MODEL,
@@ -91,7 +117,7 @@ if (localOnly) {
     messages: [{ role: "system", content: sys }, { role: "user", content: prompt }],
   });
   cost = summarizeCost(chat.usage ?? undefined);
-  answer = chat.choices[0].message.content ?? "";
+  answer = formatAnswer(chat.choices[0].message.content ?? "");
 }
 
 return NextResponse.json({
