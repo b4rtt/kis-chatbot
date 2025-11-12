@@ -2,41 +2,24 @@
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import {
+  useChatController,
+  Citation,
+} from "./components/useChatController";
 
 const PRIMARY = "#ff6200";
 
-type Citation = { id: number; file: string; idx: number; score: number };
-type CostSummary = {
-  usd: number;
-  tokens: { prompt: number; completion: number; total: number };
-};
-type ChatMessage = {
-  q: string;
-  a: string;
-  c: Citation[];
-  cost: CostSummary;
-};
-
-const emptyCost: CostSummary = {
-  usd: 0,
-  tokens: { prompt: 0, completion: 0, total: 0 },
-};
-
 export default function Page() {
-  const [q, setQ] = useState("");
-  const [msgs, setMsgs] = useState<ChatMessage[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { q, setQ, msgs, loading, error, ask, totals } = useChatController({
+    localOnly: false,
+  });
   const [openSources, setOpenSources] = useState<{
     question: string;
     citations: Citation[];
   } | null>(null);
 
-  const totalUsd = msgs.reduce((sum, msg) => sum + (msg.cost?.usd ?? 0), 0);
-  const totalTokens = msgs.reduce(
-    (sum, msg) => sum + (msg.cost?.tokens.total ?? 0),
-    0
-  );
+  const totalUsd = totals.usd;
+  const totalTokens = totals.tokens;
 
   const formatUsd = (value: number) => {
     if (value >= 1) return value.toFixed(2);
@@ -44,37 +27,11 @@ export default function Page() {
     return value.toFixed(4);
   };
 
-  async function ask() {
-    if (!q.trim() || loading) return;
-    setError(null);
-    setLoading(true);
-    try {
-      const r = await fetch("/api/ask", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: q, localOnly: false }),
-      });
-      if (!r.ok) {
-        const err = await r.json().catch(() => ({}));
-        throw new Error(err.error || "Dotaz selhal. Zkus to prosím znovu.");
-      }
-      const data = await r.json();
-      setMsgs((m) => [
-        {
-          q,
-          a: data.answer ?? "",
-          c: data.citations ?? [],
-          cost: data.cost ?? emptyCost,
-        },
-        ...m,
-      ]);
-      setQ("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Něco se pokazilo.");
-    } finally {
-      setLoading(false);
+  const handleAsk = () => {
+    if (!loading && q.trim()) {
+      void ask();
     }
-  }
+  };
 
   return (
     <main className="page">
@@ -107,10 +64,10 @@ export default function Page() {
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && ask()}
+            onKeyDown={(e) => e.key === "Enter" && handleAsk()}
             placeholder="Zeptej se na dokumentaci…"
           />
-          <button onClick={ask} disabled={loading}>
+          <button onClick={handleAsk} disabled={loading}>
             {loading ? "Probíhá…" : "Zeptat se"}
           </button>
         </section>

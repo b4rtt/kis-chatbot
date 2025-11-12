@@ -10,6 +10,7 @@ Plně lokální chatbot nad dokumentací, který může běžet na vlastním not
 - **Bez externí DB**: žádné Pinecone/Supabase, všechno žije v repozitáři.
 - **Volitelný lokální LLM**: Ollama (`llama3.1:8b-instruct`) pro 100% offline režim.
 - **Ochrana admin rout**: vše chráněno přes `x-admin-key`.
+- **Vložitelný chat widget**: `/embed/widget.js` přidá FAB tlačítko a vloží chat v iframe (`/embed/panel`) na libovolný web.
 
 ## 🧰 Předpoklady
 
@@ -730,6 +731,53 @@ curl -X POST http://localhost:3000/api/ask \
   - Nadpisy (h1, h2, h3)
   - Tabulky (GitHub Flavored Markdown)
 - ✅ **Pěkné styling**: Markdown elementy jsou stylované v souladu s designem UI (oranžové akcenty pro odkazy a tučný text)
+
+## 🔌 Vložení widgetu na jiné weby
+
+Chat můžeš nově vložit jako plovoucí FAB tlačítko s rozbalovacím panelem:
+
+```html
+<script
+  src="https://tvoje-domena.cz/embed/widget.js"
+  data-title="Pomoc s dokumentací"
+  data-subtitle="Chat, který čerpá jen z našich zdrojů"
+  data-color="#ff6200"
+  data-label="Zeptej se"
+  async
+></script>
+```
+
+- Skript vytvoří kruhové tlačítko v pravém (nebo levém) dolním rohu, které otevře iframe s aplikací na adrese `/embed/panel`.
+- Vše běží na stejné doméně, takže není potřeba řešit CORS ani další backend změny.
+- Panel je responzivní (max šířka/výška podle viewportu) a zachovává stejné funkce jako hlavní UI, včetně citací a markdown renderingu.
+
+### Dostupné atributy
+
+- `data-title` / `data-subtitle` – texty v záhlaví panelu.
+- `data-color` – primární barva (dotkne se FAB tlačítka i widgetu, zároveň se propíše do query parametru `accent`).
+- `data-label` – text ve FAB tlačítku, `data-icon` pro emoji/znak vedle textu.
+- `data-position` – `"left"` nebo `"right"` (výchozí).
+- `data-width` / `data-height` – rozměr panelu (např. `data-width="420px"`).
+- `data-offset`, případně `data-offset-x` a `data-offset-y` – odsazení od okrajů stránky.
+- `data-panel-url` – pokud chceš načíst jinou adresu (např. proxy nebo jinou jazykovou mutaci). Musí jít o URL hostované na stejné doméně kvůli přístupu na API.
+
+Chceš-li widget vložit ručně do vlastní komponenty, můžeš použít rovnou iframe:
+
+```html
+<iframe
+  src="https://tvoje-domena.cz/embed/panel?accent=%23ff6200&title=Support%20Bot"
+  width="360"
+  height="520"
+  style="border:0;border-radius:20px;box-shadow:0 30px 60px rgba(5,6,8,0.45)"
+></iframe>
+```
+
+Interakce můžeš ovládat vlastním kódem:
+
+- `window.postMessage({ type: "esports-chat-open" }, "*")` — otevře panel.
+- `window.postMessage({ type: "esports-chat-close" }, "*")` — zavře panel.
+- `window.postMessage({ type: "esports-chat-toggle" }, "*")` — přepne stav.
+- Nebo přímo `window.esportsChatWidget?.open()/close()/toggle()`.
 
 ### Jak reindexovat dokumenty
 
