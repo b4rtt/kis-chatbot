@@ -77,7 +77,15 @@ const [qvec] = await embedTexts([query]);
 
 // Retrieve top-K chunks
 const index = await loadIndex();
-const passages = topK(qvec, index.items, Number(k) || 6);
+const items = index?.items ?? [];
+const passages = topK(qvec, items, Number(k) || 6);
+if (!passages.length) {
+  return NextResponse.json({
+    answer: CONTACT_MESSAGE,
+    citations: [],
+    cost: zeroCost,
+  });
+}
 const context = passages.map((p,i)=>`[#${i+1}] ${p.file}\n---\n${p.content}`).join("\n\n");
 
 const sys = "You answer ONLY from the provided context. If info is missing, say 'Not in the docs.' Be concise and end with [#] citations.";
