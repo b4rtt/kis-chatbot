@@ -709,6 +709,19 @@ curl -X POST http://localhost:3000/api/ask \
 - ✅ **Opravené embedování v batch**: Funkce `embedTexts` nyní správně zpracovává více textů najednou (dříve vrátila jen 1 vektor pro všechny texty)
 - ✅ **Pomocný skript**: Přidán `scripts/reindex-docs.ts` pro snadnou reindexaci dokumentů
 
+### Markdown rendering v UI (2024-11)
+
+- ✅ **Automatické renderování markdownu**: Odpovědi se nyní zobrazují s formátováním namísto surového markdownu
+- ✅ **Podpora pro**:
+  - **Tučný text** a *kurzíva*
+  - [Odkazy](https://example.com)
+  - `Inline kód` a bloky kódu
+  - Seznamy (odrážkové i číslované)
+  - > Citace
+  - Nadpisy (h1, h2, h3)
+  - Tabulky (GitHub Flavored Markdown)
+- ✅ **Pěkné styling**: Markdown elementy jsou stylované v souladu s designem UI (oranžové akcenty pro odkazy a tučný text)
+
 ### Jak reindexovat dokumenty
 
 ```bash

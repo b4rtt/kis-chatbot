@@ -1,5 +1,7 @@
 "use client";
 import { useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 const PRIMARY = "#ff6200";
 
@@ -132,7 +134,11 @@ export default function Page() {
                 </div>
                 <div className="answer">
                   <span className="badge answer-badge">Bot</span>
-                  <p>{m.a}</p>
+                  <div className="markdown-content">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {m.a}
+                    </ReactMarkdown>
+                  </div>
                 </div>
                 <div className="meta">
                   <div>
@@ -344,6 +350,82 @@ export default function Page() {
         .question p {
           margin: 0;
           white-space: pre-wrap;
+        }
+        .markdown-content {
+          flex: 1;
+          line-height: 1.6;
+        }
+        .markdown-content p {
+          margin: 0 0 12px 0;
+        }
+        .markdown-content p:last-child {
+          margin-bottom: 0;
+        }
+        .markdown-content strong {
+          color: ${PRIMARY};
+          font-weight: 600;
+        }
+        .markdown-content em {
+          font-style: italic;
+          color: rgba(255, 255, 255, 0.85);
+        }
+        .markdown-content a {
+          color: ${PRIMARY};
+          text-decoration: none;
+          border-bottom: 1px solid transparent;
+          transition: border-color 150ms ease;
+        }
+        .markdown-content a:hover {
+          border-bottom-color: ${PRIMARY};
+        }
+        .markdown-content code {
+          background: rgba(255, 255, 255, 0.08);
+          padding: 2px 6px;
+          border-radius: 4px;
+          font-family: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono",
+            Consolas, "Courier New", monospace;
+          font-size: 0.9em;
+        }
+        .markdown-content pre {
+          background: rgba(255, 255, 255, 0.05);
+          padding: 12px 16px;
+          border-radius: 8px;
+          overflow-x: auto;
+          margin: 8px 0;
+        }
+        .markdown-content pre code {
+          background: transparent;
+          padding: 0;
+        }
+        .markdown-content ul,
+        .markdown-content ol {
+          margin: 8px 0;
+          padding-left: 24px;
+        }
+        .markdown-content li {
+          margin: 4px 0;
+        }
+        .markdown-content blockquote {
+          border-left: 3px solid ${PRIMARY};
+          padding-left: 16px;
+          margin: 12px 0;
+          color: rgba(255, 255, 255, 0.8);
+          font-style: italic;
+        }
+        .markdown-content h1,
+        .markdown-content h2,
+        .markdown-content h3 {
+          margin: 16px 0 8px 0;
+          color: ${PRIMARY};
+        }
+        .markdown-content h1 {
+          font-size: 1.5rem;
+        }
+        .markdown-content h2 {
+          font-size: 1.3rem;
+        }
+        .markdown-content h3 {
+          font-size: 1.1rem;
         }
         .badge {
           padding: 4px 10px;
