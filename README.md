@@ -29,7 +29,8 @@ mkdir -p docs app/api/admin lib
 
 # 4) Přidej proměnné prostředí
 cat > .env.local <<'ENV'
-DOCS_BASE_URL=https://docs.example.com # veřejný HTTPS kořen dokumentace
+DOCS_BASE_URLS=https://docs.example.com,https://help.example.com # veřejné HTTPS kořeny (odděluj čárkou)
+# DOCS_BASE_URL=https://docs.example.com # volitelné, pokud chceš zadat jen jeden zdroj
 DOCS_DIR=./docs
 ADMIN_KEY=super_secret_key
 
@@ -83,30 +84,35 @@ local-docs-chat/
 
 ### `lib/crawler.ts`
 ```ts
-const BASE = process.env.DOCS_BASE_URL!;
+const RAW_BASES = process.env.DOCS_BASE_URLS ?? process.env.DOCS_BASE_URL ?? "";
+const BASES = RAW_BASES.split(/[, \s]+/).map((b) => b.trim()).filter(Boolean);
 const MAX_PAGES = 200;
 
-function abs(u: string) {
-  try { return new URL(u, BASE).toString(); } catch { return null; }
+if (!BASES.length) {
+  throw new Error("Set DOCS_BASE_URL or DOCS_BASE_URLS with at least one HTTPS root.");
 }
 
-export async function listMarkdownUrls(): Promise<string[]> {
-  // Preferuj manifest na BASE/index.json (["/a.md", "/b.md"])
-  try {
-    const r = await fetch(new URL("index.json", BASE));
-    if (r.ok) {
-      const j = await r.json();
-      const arr = Array.isArray(j) ? j : Array.isArray(j.urls) ? j.urls : [];
-      const urls = arr
-        .map((u: string) => abs(u))
-        .filter(Boolean)
-        .filter((u: string) => u.endsWith(".md"));
-      if (urls.length) return urls as string[];
-    }
-  } catch {}
+function abs(u: string, base: string) {
+  try { return new URL(u, base).toString(); } catch { return null; }
+}
 
-  // Fallback: mělký crawl na stejné doméně
-  const seen = new Set<string>(), out = new Set<string>(), q = [BASE];
+async function listFromManifest(base: string) {
+  try {
+    const r = await fetch(new URL("index.json", base));
+    if (!r.ok) return [];
+    const j = await r.json();
+    const arr = Array.isArray(j) ? j : Array.isArray(j.urls) ? j.urls : [];
+    return arr
+      .map((u: string) => abs(u, base))
+      .filter(Boolean)
+      .filter((u: string) => u.endsWith(".md")) as string[];
+  } catch {
+    return [];
+  }
+}
+
+async function crawlBase(base: string) {
+  const seen = new Set<string>(), out = new Set<string>(), q = [base];
   while (q.length && seen.size < MAX_PAGES) {
     const u = q.shift()!;
     if (seen.has(u)) continue; seen.add(u);
@@ -122,14 +128,33 @@ export async function listMarkdownUrls(): Promise<string[]> {
     const html = await res.text();
     const links = Array.from(html.matchAll(/href="([^"]+)"/g)).map(m => m[1]);
     for (const l of links) {
-      const u2 = abs(l);
-      if (!u2 || !u2.startsWith(BASE)) continue;
+      const u2 = abs(l, base);
+      if (!u2 || !u2.startsWith(base)) continue;
       if (u2.endsWith(".md")) out.add(u2);
       else if (!u2.includes("#")) q.push(u2);
     }
   }
-  if (!out.size) throw new Error("No .md URLs found. Consider providing index.json manifest.");
   return Array.from(out);
+}
+
+export async function listMarkdownUrls(): Promise<string[]> {
+  const urls = new Set<string>();
+
+  for (const base of BASES) {
+    const manifest = await listFromManifest(base);
+    if (manifest.length) {
+      manifest.forEach((u) => urls.add(u));
+      continue;
+    }
+    const crawled = await crawlBase(base);
+    crawled.forEach((u) => urls.add(u));
+  }
+
+  if (!urls.size) {
+    throw new Error("No .md URLs found. Provide index.json manifests or check DOCS_BASE_URLS.");
+  }
+
+  return Array.from(urls);
 }
 ```
 
@@ -495,7 +520,7 @@ curl -X POST http://localhost:3000/api/ask \
 - První běh embeddingu stáhne model `@xenova/transformers` (počítej s tím).
 
 ## 🧪 Odstraňování potíží
-- **Žádné markdowny**: přidej manifest `${DOCS_BASE_URL}/index.json`.
+- **Žádné markdowny**: přidej manifest `<tvůj_koren>/index.json` pro každý z kořenů v `DOCS_BASE_URLS`.
 - **První reindex je pomalý**: stahuje se model, pak už to běží rychle.
 - **Halucinace**: sniž `k` (třeba na 4), zpřísni systémový prompt, kontroluj dělení na bloky.
 - **Lokální LLM je pomalé**: zvol menší model (např. `mistral:7b`) nebo hybridní režim.
@@ -513,4 +538,4 @@ curl -X POST http://localhost:3000/api/ask \
   - `POST /api/admin/reindex` vytváří `docs/index.json`
   - `POST /api/ask` vrací stručné odpovědi s citacemi
 
-Hotovo. Zkopíruj tento README do Cursoru, nech Agenta projekt vystavět, doplň `DOCS_BASE_URL`, spusť sync → reindex → otázka a máš lokální, levný chatbot nad dokumentací.
+Hotovo. Zkopíruj tento README do Cursoru, nech Agenta projekt vystavět, doplň `DOCS_BASE_URLS` (nebo `DOCS_BASE_URL`), spusť sync → reindex → otázka a máš lokální, levný chatbot nad dokumentací.
