@@ -19,6 +19,22 @@ const emptyCost: CostSummary = {
   tokens: { prompt: 0, completion: 0, total: 0 },
 };
 
+const CONTACT_MESSAGE = `Na tuto otázku bohužel nemáme odpověď.
+
+--------------------------------
+Kontakt
+Nevíte si rady? Máte dotaz?
+
+Než nás kontaktujete, doporučujeme navštívit stránku Časté dotazy (https://kis.esportsmedia.com/caste-dotazy), kde najdete odpovědi na nejčastější otázky.
+Pokud odpověď nenajdete, náš tým technické podpory je vám k dispozici každý den, včetně víkendů, od 8:00 do 20:00.
+
+Technická podpora (Denně 8 - 20)
+
++420 777 044 960
+Napište nám
+
+kis@esportsmedia.cz`;
+
 type UseChatOptions = {
   endpoint?: string;
   localOnly?: boolean;
@@ -52,7 +68,7 @@ export function useChatController(options: UseChatOptions = {}) {
       setMsgs((prev) => [
         {
           q: question,
-          a: data.answer ?? "",
+          a: data.answer === null ? CONTACT_MESSAGE : (data.answer ?? ""),
           c: data.citations ?? [],
           cost: data.cost ?? emptyCost,
         },

@@ -9,21 +9,6 @@ const INPUT_PRICE = Number(process.env.OPENAI_INPUT_PRICE_PER_1K ?? "0.00015");
 const OUTPUT_PRICE = Number(process.env.OPENAI_OUTPUT_PRICE_PER_1K ?? "0.0006");
 const RATE_LIMIT_MAX_REQUESTS = Number(process.env.RATE_LIMIT_MAX_REQUESTS ?? "20");
 const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000; // 10 minut
-const CONTACT_MESSAGE = `Na tuto otázku bohužel nemáme odpověď.
-
---------------------------------
-Kontakt
-Nevíte si rady? Máte dotaz?
-
-Než nás kontaktujete, doporučujeme navštívit stránku Časté dotazy (https://kis.esportsmedia.com/caste-dotazy), kde najdete odpovědi na nejčastější otázky.
-Pokud odpověď nenajdete, náš tým technické podpory je vám k dispozici každý den, včetně víkendů, od 8:00 do 20:00.
-
-Technická podpora (Denně 8 - 20)
-
-+420 777 044 960
-Napište nám
-
-kis@esportsmedia.cz`;
 
 type UsageSummary = {
   prompt_tokens?: number;
@@ -47,9 +32,9 @@ function summarizeCost(usage?: UsageSummary) {
   };
 }
 
-function formatAnswer(answer: string) {
+function formatAnswer(answer: string): string | null {
   const text = answer?.trim() ?? "";
-  if (!text) return CONTACT_MESSAGE;
+  if (!text) return null;
   const normalized = text.toLowerCase();
   const triggers = [
     "not in the docs",
@@ -58,7 +43,7 @@ function formatAnswer(answer: string) {
     "není v dokumentaci",
   ];
   if (triggers.some((phrase) => normalized.includes(phrase))) {
-    return CONTACT_MESSAGE;
+    return null;
   }
   return answer;
 }
@@ -123,7 +108,7 @@ for (const candidate of keywordPassages) {
 const passages = merged.slice(0, Number(k) || 6);
 if (!passages.length) {
   return NextResponse.json({
-    answer: CONTACT_MESSAGE,
+    answer: null,
     citations: [],
     cost: zeroCost,
   });
@@ -162,7 +147,7 @@ if (maxScore < 0.28 && !localOnly && process.env.OPENAI_API_KEY) {
 }
 
 // Local generation (Ollama) or cloud if localOnly=false and OPENAI_API_KEY set
-let answer: string;
+let answer: string | null;
 let cost = zeroCost;
 if (localOnly) {
   answer = formatAnswer(await generateLocal(prompt));
