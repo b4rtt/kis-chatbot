@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loadIndex, topK, keywordSearch } from "@/lib/search";
 import OpenAI from "openai";
+import { checkRateLimit, getIdentifier } from "@/lib/rateLimit";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 const INPUT_PRICE = Number(process.env.OPENAI_INPUT_PRICE_PER_1K ?? "0.00015");
 const OUTPUT_PRICE = Number(process.env.OPENAI_OUTPUT_PRICE_PER_1K ?? "0.0006");
+const RATE_LIMIT_MAX_REQUESTS = Number(process.env.RATE_LIMIT_MAX_REQUESTS ?? "20");
+const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000; // 10 minut
 const CONTACT_MESSAGE = `Na tuto otázku bohužel nemáme odpověď.
 
 --------------------------------
@@ -75,6 +78,30 @@ return data.response as string;
 }
 
 export async function POST(req: NextRequest) {
+  // Rate limiting
+  const identifier = getIdentifier(req);
+  const rateLimit = checkRateLimit(identifier, RATE_LIMIT_MAX_REQUESTS, RATE_LIMIT_WINDOW_MS);
+  
+  if (!rateLimit.allowed) {
+    const resetDate = new Date(rateLimit.resetAt);
+    return NextResponse.json(
+      {
+        error: "Too Many Requests",
+        message: `Překročen limit požadavků. Maximálně ${RATE_LIMIT_MAX_REQUESTS} zpráv za 10 minut.`,
+        resetAt: resetDate.toISOString(),
+      },
+      {
+        status: 429,
+        headers: {
+          "X-RateLimit-Limit": String(RATE_LIMIT_MAX_REQUESTS),
+          "X-RateLimit-Remaining": String(rateLimit.remaining),
+          "X-RateLimit-Reset": String(rateLimit.resetAt),
+          "Retry-After": String(Math.ceil((rateLimit.resetAt - Date.now()) / 1000)),
+        },
+      }
+    );
+  }
+
 const { query, k = 6, localOnly = true } = await req.json();
 if (!query) return NextResponse.json({ error: "Chybí dotaz" }, { status: 400 });
 
@@ -125,6 +152,12 @@ if (maxScore < 0.28 && !localOnly && process.env.OPENAI_API_KEY) {
     answer,
     citations: passages.map((p,i)=>({ id:i+1, file:p.file, idx:p.idx, score:p.score })),
     cost,
+  }, {
+    headers: {
+      "X-RateLimit-Limit": String(RATE_LIMIT_MAX_REQUESTS),
+      "X-RateLimit-Remaining": String(rateLimit.remaining),
+      "X-RateLimit-Reset": String(rateLimit.resetAt),
+    },
   });
 }
 
@@ -147,5 +180,11 @@ return NextResponse.json({
   answer,
   citations: passages.map((p,i)=>({ id:i+1, file:p.file, idx:p.idx, score:p.score })),
   cost,
+}, {
+  headers: {
+    "X-RateLimit-Limit": String(RATE_LIMIT_MAX_REQUESTS),
+    "X-RateLimit-Remaining": String(rateLimit.remaining),
+    "X-RateLimit-Reset": String(rateLimit.resetAt),
+  },
 });
 }

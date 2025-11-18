@@ -779,6 +779,34 @@ PUBLIC_API_KEY=your_secret_key_here
 RATE_LIMIT_MAX_REQUESTS=20
 ```
 
+### ⚠️ Rate Limiting na Vercelu
+
+**Aktuální implementace používá in-memory storage**, což má na Vercelu tyto limity:
+
+1. **Serverless funkce**: Každý request může běžet na jiné instanci → data se resetují
+2. **Deploy/Restart**: Při každém deploy se paměť vymaže → limity se resetují
+3. **Cold starts**: Nová instance = prázdná paměť
+
+**Řešení pro produkci:**
+
+Pro spolehlivý rate limiting na Vercelu použij **Vercel KV** (key-value store):
+
+1. Vytvoř KV store v [Vercel Dashboard](https://vercel.com/dashboard)
+2. Nainstaluj balíček: `npm install @vercel/kv`
+3. Přidej proměnné prostředí:
+   ```env
+   KV_REST_API_URL=your_kv_url
+   KV_REST_API_TOKEN=your_kv_token
+   ```
+4. Použij `lib/rateLimitKV.ts.example` jako základ (přejmenuj na `rateLimitKV.ts`)
+
+Alternativně můžeš použít **Vercel Edge Middleware** s KV pro ještě lepší výkon.
+
+**Aktuální identifikace:**
+- Kombinace IP adresy + User-Agent hash
+- Lepší než jen IP (sníží problém se sdílenými IP za NAT/proxy)
+- Pro ještě lepší identifikaci použij session cookie nebo user ID
+
 ### JavaScript/TypeScript příklad
 
 ```typescript
