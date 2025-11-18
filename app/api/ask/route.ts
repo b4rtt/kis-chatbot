@@ -154,8 +154,15 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const context = passages.map((p, i) => `[#${i + 1}] ${p.file}\n---\n${p.content}`).join("\n\n");
-    const sys = "Odpovídej pouze z dodaného kontextu. Když informace chybí, řekni 'Není v dokumentaci.' Buď stručný a odpověď zakonči citacemi ve formátu [#].";
+    // Formátování kontextu - pokud jsou vypnuté citace, nepřidávej čísla
+    const context = includeCitations
+      ? passages.map((p, i) => `[#${i + 1}] ${p.file}\n---\n${p.content}`).join("\n\n")
+      : passages.map((p) => `${p.file}\n---\n${p.content}`).join("\n\n");
+    
+    const sys = includeCitations
+      ? "Odpovídej pouze z dodaného kontextu. Když informace chybí, řekni 'Není v dokumentaci.' Buď stručný a odpověď zakonči citacemi ve formátu [#]."
+      : "Odpovídej pouze z dodaného kontextu. Když informace chybí, řekni 'Není v dokumentaci.' Buď stručný.";
+    
     const prompt = `${sys}\n\nQuestion: ${query}\n\nContext:\n${context}`;
 
     const rateLimitHeaders = {
@@ -175,7 +182,12 @@ export async function POST(req: NextRequest) {
       messages: [{ role: "system", content: sys }, { role: "user", content: prompt }],
     });
     const cost = summarizeCost(chat.usage ?? undefined);
-    const answer = formatAnswer(chat.choices[0].message.content ?? "");
+    let answer = formatAnswer(chat.choices[0].message.content ?? "");
+    
+    // Pokud jsou vypnuté citace, odstraň všechny [#X] reference z odpovědi
+    if (!includeCitations && answer) {
+      answer = answer.replace(/\s*\[#\d+\]\s*/g, " ").trim();
+    }
 
     const response: any = {
       answer,
