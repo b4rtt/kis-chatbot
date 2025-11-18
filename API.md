@@ -44,9 +44,7 @@ x-api-key: your_secret_key_here
 ```json
 {
   "query": "Jak resetovat heslo?",
-  "websiteUrl": "https://example.com",
-  "k": 6,
-  "localOnly": false
+  "websiteUrl": "https://example.com"
 }
 ```
 
@@ -57,7 +55,6 @@ x-api-key: your_secret_key_here
 | `query`            | string  | ✅ Ano   | -       | Dotaz uživatele                                                                                      |
 | `websiteUrl`       | string  | ✅ Ano\* | -       | URL webu, na kterém API běží (\*povinný pouze při použití veřejného API režimu s `x-api-key` header) |
 | `k`                | number  | ❌ Ne    | 6       | Počet relevantních pasáží k vrácení                                                                  |
-| `localOnly`        | boolean | ❌ Ne    | true    | Použít pouze lokální LLM (Ollama)                                                                    |
 | `includeCitations` | boolean | ❌ Ne    | false   | Zahrnout citations do odpovědi                                                                       |
 
 ## Response
@@ -161,9 +158,7 @@ curl -X POST https://esports-chatbot.vercel.app/api/ask \
   -H "x-api-key: your_secret_key_here" \
   -d '{
     "query": "Kdo je Adam Joska?",
-    "websiteUrl": "https://example.com",
-    "k": 6,
-    "localOnly": false
+    "websiteUrl": "https://example.com"
   }'
 ```
 
@@ -183,7 +178,6 @@ async function askChatbot(query: string, websiteUrl: string) {
         query,
         websiteUrl,
         k: 6,
-        localOnly: false,
       }),
     }
   );
@@ -320,7 +314,6 @@ def ask_chatbot(query: str, website_url: str, api_key: str):
         "query": query,
         "websiteUrl": website_url,
         "k": 6,
-        "localOnly": False,
     }
 
     response = requests.post(url, json=data, headers=headers)

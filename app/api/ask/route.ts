@@ -49,19 +49,6 @@ function formatAnswer(answer: string): string | null {
   return answer;
 }
 
-async function generateLocal(prompt: string) {
-const r = await fetch("http://127.0.0.1:11434/api/generate", {
-method: "POST",
-headers: {"Content-Type":"application/json"},
-body: JSON.stringify({
-model: process.env.OLLAMA_MODEL || "llama3.1:8b-instruct",
-prompt, stream: false,
-options: { temperature: 0.2 },
-}),
-});
-const data = await r.json();
-return data.response as string;
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -104,7 +91,7 @@ export async function POST(req: NextRequest) {
 
     // 3. Parsování těla požadavku
     const body = await req.json();
-    const { query, websiteUrl, k = 6, localOnly = true, includeCitations = false } = body;
+    const { query, websiteUrl, k = 6, includeCitations = false } = body;
 
     // 4. Validace povinných parametrů
     if (!query) {
@@ -171,53 +158,24 @@ export async function POST(req: NextRequest) {
     const sys = "Odpovídej pouze z dodaného kontextu. Když informace chybí, řekni 'Není v dokumentaci.' Buď stručný a odpověď zakonči citacemi ve formátu [#].";
     const prompt = `${sys}\n\nQuestion: ${query}\n\nContext:\n${context}`;
 
-    const maxScore = vectorPassages[0]?.score ?? 0;
     const rateLimitHeaders = {
       "X-RateLimit-Limit": String(RATE_LIMIT_MAX_REQUESTS),
       "X-RateLimit-Remaining": String(rateLimit.remaining),
       "X-RateLimit-Reset": String(rateLimit.resetAt),
     };
 
-    // Confidence threshold (optional)
-    if (maxScore < 0.28 && !localOnly && process.env.OPENAI_API_KEY) {
-      // fallback to cloud for tricky queries
-      const chat = await openai.chat.completions.create({
-        model: OPENAI_MODEL,
-        temperature: 0.2,
-        messages: [
-          { role: "system", content: sys },
-          { role: "user", content: prompt },
-        ],
-      });
-      const cost = summarizeCost(chat.usage ?? undefined);
-      const rawAnswer = chat.choices[0].message.content ?? "";
-      const answer = formatAnswer(rawAnswer);
-      const response: any = {
-        answer,
-        cost,
-      };
-      if (includeCitations) {
-        response.citations = passages.map((p, i) => ({ id: i + 1, file: p.file, idx: p.idx, score: p.score }));
-      }
-      return NextResponse.json(response, {
-        headers: rateLimitHeaders,
-      });
+    // Generate answer using OpenAI
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error("OPENAI_API_KEY is not configured. Please set it in environment variables.");
     }
 
-    // Local generation (Ollama) or cloud if localOnly=false and OPENAI_API_KEY set
-    let answer: string | null;
-    let cost = zeroCost;
-    if (localOnly) {
-      answer = formatAnswer(await generateLocal(prompt));
-    } else {
-      const chat = await openai.chat.completions.create({
-        model: OPENAI_MODEL,
-        temperature: 0.2,
-        messages: [{ role: "system", content: sys }, { role: "user", content: prompt }],
-      });
-      cost = summarizeCost(chat.usage ?? undefined);
-      answer = formatAnswer(chat.choices[0].message.content ?? "");
-    }
+    const chat = await openai.chat.completions.create({
+      model: OPENAI_MODEL,
+      temperature: 0.2,
+      messages: [{ role: "system", content: sys }, { role: "user", content: prompt }],
+    });
+    const cost = summarizeCost(chat.usage ?? undefined);
+    const answer = formatAnswer(chat.choices[0].message.content ?? "");
 
     const response: any = {
       answer,

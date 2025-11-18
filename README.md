@@ -502,23 +502,9 @@ import OpenAI from "openai";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
-async function generateLocal(prompt: string) {
-  const r = await fetch("http://127.0.0.1:11434/api/generate", {
-    method: "POST",
-    headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({
-      model: process.env.OLLAMA_MODEL || "llama3.1:8b-instruct",
-      prompt, stream: false,
-      options: { temperature: 0.2 },
-    }),
-  });
-  const data = await r.json();
-  return data.response as string;
-}
-
 export async function POST(req: NextRequest) {
-  const { query, k = 6, localOnly = true } = await req.json();
-  if (!query) return NextResponse.json({ error: "Chybí dotaz" }, { status: 400 });
+  const { query, k = 6, includeCitations = false } = await req.json();
+  if (!query) return NextResponse.json({ error: "Missing query parameter" }, { status: 400 });
 
   const { embedTexts } = await import("@/lib/localEmbeddings");
   const [qvec] = await embedTexts([query]);
@@ -533,41 +519,30 @@ export async function POST(req: NextRequest) {
   }
   const passages = merged.slice(0, Number(k) || 6);
   if (!passages.length) {
-    return NextResponse.json({ answer: "Kontakt…", citations: [], cost: { ... } });
+    const response: any = { answer: null, cost: { usd: 0, tokens: { prompt: 0, completion: 0, total: 0 } } };
+    if (includeCitations) response.citations = [];
+    return NextResponse.json(response);
   }
 
   const context = passages.map((p,i)=>`[#${i+1}] ${p.file}\n---\n${p.content}`).join("\n\n");
-  const sys = "Odpovídej pouze z kontextu…";
+  const sys = "Odpovídej pouze z dodaného kontextu. Když informace chybí, řekni 'Není v dokumentaci.' Buď stručný a odpověď zakonči citacemi ve formátu [#].";
   const prompt = `${sys}\n\nQuestion: ${query}\n\nContext:\n${context}`;
 
-  const maxScore = vectorPassages[0]?.score ?? 0;
-  if (maxScore < 0.28 && !localOnly && process.env.OPENAI_API_KEY) {
-    const chat = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      temperature: 0.2,
-      messages: [
-        { role: "system", content: sys },
-        { role: "user", content: prompt },
-      ],
-    });
-    return NextResponse.json({
-      answer: chat.choices[0].message.content,
-      citations: passages.map((p,i)=>({ id:i+1, file:p.file, idx:p.idx, score:p.score })),
-    });
-  }
-
-  const answer = localOnly
-    ? await generateLocal(prompt)
-    : (await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        temperature: 0.2,
-        messages: [{ role: "system", content: sys }, { role: "user", content: prompt }],
-      })).choices[0].message.content ?? "";
-
-  return NextResponse.json({
-    answer,
-    citations: passages.map((p,i)=>({ id:i+1, file:p.file, idx:p.idx, score:p.score })),
+  const chat = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    temperature: 0.2,
+    messages: [{ role: "system", content: sys }, { role: "user", content: prompt }],
   });
+  
+  const cost = summarizeCost(chat.usage ?? undefined);
+  const answer = formatAnswer(chat.choices[0].message.content ?? "");
+  
+  const response: any = { answer, cost };
+  if (includeCitations) {
+    response.citations = passages.map((p,i)=>({ id:i+1, file:p.file, idx:p.idx, score:p.score }));
+  }
+  
+  return NextResponse.json(response);
 }
 ```
 
@@ -587,7 +562,7 @@ export default function Page() {
     const r = await fetch("/api/ask", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: q, localOnly: false }),
+      body: JSON.stringify({ query: q }),
     });
     const data = await r.json();
     setMsgs((m) => [...m, { q, a: data.answer, c: data.citations }]);
@@ -705,7 +680,6 @@ curl -X POST https://esports-chatbot.vercel.app/api/ask \
     "query": "Jak resetovat heslo?",
     "websiteUrl": "https://example.com",
     "k": 6,
-    "localOnly": false
   }'
 ```
 
@@ -717,7 +691,6 @@ curl -X POST https://esports-chatbot.vercel.app/api/ask \
 
 **Volitelné:**
 - `k` (number, výchozí: 6): Počet relevantních pasáží k vrácení
-- `localOnly` (boolean, výchozí: true): Použít pouze lokální LLM (Ollama), nebo povolit fallback na cloudový model
 - `includeCitations` (boolean, výchozí: false): Zahrnout citations do odpovědi (frontend automaticky posílá `true`)
 
 ### Odpověď
@@ -825,7 +798,6 @@ async function askChatbot(query: string, websiteUrl: string) {
       query,
       websiteUrl,
       k: 6,
-      localOnly: false,
     }),
   });
 
@@ -852,24 +824,6 @@ try {
 }
 ```
 
-## 🧱 Volitelně: Lokální LLM přes Ollamu
-
-1. Nainstaluj Ollamu (macOS/Linux/Win): https://ollama.com
-2. Stáhni model:
-   ```bash
-   ollama pull llama3.1:8b-instruct
-   ```
-3. Spusť server: `ollama serve`
-4. V `.env.local` nastav `OLLAMA_MODEL=llama3.1:8b-instruct`
-
-`/api/ask` použije Ollamu, pokud `localOnly: true` (výchozí).
-
-## 🔁 Hybridní režim (lokálně + cloud)
-
-- Embeddingy zůstávají lokální.
-- Generování může spadnout do cloudu (levný model) jen když je potřeba.
-- Pošli `localOnly: false` v těle `/api/ask`, případně využij prah hodnoty relevance (`maxScore`).
-- Cena je na malém provozu v řádu centů za měsíc.
 
 ## 🔒 Bezpečnost
 

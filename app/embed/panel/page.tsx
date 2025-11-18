@@ -69,9 +69,7 @@ function WidgetPanelInner() {
   const subtitle =
     searchParams.get("subtitle") ?? "Ptej se na dokumentaci, která je v indexu.";
 
-  const { q, setQ, msgs, loading, error, ask } = useChatController({
-    localOnly: false,
-  });
+  const { q, setQ, msgs, loading, error, ask } = useChatController();
 
   const orderedMessages = useMemo(() => [...msgs].reverse(), [msgs]);
 

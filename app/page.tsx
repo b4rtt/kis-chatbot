@@ -10,9 +10,7 @@ import {
 const PRIMARY = "#ff6200";
 
 export default function Page() {
-  const { q, setQ, msgs, loading, error, ask, totals } = useChatController({
-    localOnly: false,
-  });
+  const { q, setQ, msgs, loading, error, ask, totals } = useChatController();
   const [openSources, setOpenSources] = useState<{
     question: string;
     citations: Citation[];
