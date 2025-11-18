@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         error: "Too Many Requests",
-        message: `Překročen limit požadavků. Maximálně ${RATE_LIMIT_MAX_REQUESTS} zpráv za 10 minut.`,
+        message: `Rate limit exceeded. Maximum ${RATE_LIMIT_MAX_REQUESTS} requests per 10 minutes.`,
         resetAt: resetDate.toISOString(),
       },
       {
@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
   }
 
 const { query, k = 6, localOnly = true } = await req.json();
-if (!query) return NextResponse.json({ error: "Chybí dotaz" }, { status: 400 });
+if (!query) return NextResponse.json({ error: "Missing query parameter" }, { status: 400 });
 
 // Local query embedding
 const { embedTexts } = await import("@/lib/localEmbeddings");

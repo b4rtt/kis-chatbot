@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
     const apiKey = req.headers.get("x-api-key") || req.headers.get("authorization")?.replace("Bearer ", "");
     if (!PUBLIC_API_KEY || apiKey !== PUBLIC_API_KEY) {
       return NextResponse.json(
-        { error: "Unauthorized", message: "Neplatný nebo chybějící API klíč" },
+        { error: "Unauthorized", message: "Invalid or missing API key" },
         { status: 401 }
       );
     }
@@ -98,14 +98,14 @@ export async function POST(req: NextRequest) {
     // 3. Validace povinných parametrů
     if (!query) {
       return NextResponse.json(
-        { error: "Bad Request", message: "Chybí dotaz (query)" },
+        { error: "Bad Request", message: "Missing required parameter: query" },
         { status: 400 }
       );
     }
 
     if (!websiteUrl) {
       return NextResponse.json(
-        { error: "Bad Request", message: "Chybí povinný parametr websiteUrl" },
+        { error: "Bad Request", message: "Missing required parameter: websiteUrl" },
         { status: 400 }
       );
     }
@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
       new URL(websiteUrl);
     } catch {
       return NextResponse.json(
-        { error: "Bad Request", message: "Neplatný formát URL v parametru websiteUrl" },
+        { error: "Bad Request", message: "Invalid URL format in websiteUrl parameter" },
         { status: 400 }
       );
     }
@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           error: "Too Many Requests",
-          message: `Překročen limit požadavků. Maximálně ${RATE_LIMIT_MAX_REQUESTS} zpráv za 10 minut.`,
+          message: `Rate limit exceeded. Maximum ${RATE_LIMIT_MAX_REQUESTS} requests per 10 minutes.`,
           resetAt: resetDate.toISOString(),
         },
         {
