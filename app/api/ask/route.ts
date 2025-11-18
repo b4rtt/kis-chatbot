@@ -123,7 +123,9 @@ export async function POST(req: NextRequest) {
 
     // 3. Parsování těla požadavku
     const body = await req.json();
-    const { query, websiteUrl, k = 6, includeCitations = false, includeCosts = false, includeMarkdown = true } = body;
+    // Pro veřejné API je výchozí includeMarkdown false (plain text), pro interní API true (markdown)
+    const defaultIncludeMarkdown = isPublicAPI ? false : true;
+    const { query, websiteUrl, k = 6, includeCitations = false, includeCosts = false, includeMarkdown = defaultIncludeMarkdown } = body;
 
     // 4. Validace povinných parametrů
     if (!query) {

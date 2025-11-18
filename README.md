@@ -714,7 +714,7 @@ curl -X POST https://esports-chatbot.vercel.app/api/ask \
 - `k` (number, výchozí: 6): Počet relevantních pasáží k vrácení
 - `includeCitations` (boolean, výchozí: false): Zahrnout citations do odpovědi (frontend automaticky posílá `true`)
 - `includeCosts` (boolean, výchozí: false): Zahrnout cost informace do odpovědi (frontend automaticky posílá `true`)
-- `includeMarkdown` (boolean, výchozí: true): Vrátit odpověď s markdown formátováním (false = plain text, frontend automaticky posílá `true`)
+- `includeMarkdown` (boolean, výchozí: false pro veřejné API, true pro interní): Vrátit odpověď s markdown formátováním (false = plain text, frontend automaticky posílá `true`)
 
 ### Odpověď
 

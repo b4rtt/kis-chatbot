@@ -50,14 +50,14 @@ x-api-key: your_secret_key_here
 
 ### Parametry
 
-| Parametr           | Typ     | Povinný  | Výchozí | Popis                                                                                                |
-| ------------------ | ------- | -------- | ------- | ---------------------------------------------------------------------------------------------------- |
-| `query`            | string  | ✅ Ano   | -       | Dotaz uživatele                                                                                      |
-| `websiteUrl`       | string  | ✅ Ano\* | -       | URL webu, na kterém API běží (\*povinný pouze při použití veřejného API režimu s `x-api-key` header) |
-| `k`                | number  | ❌ Ne    | 6       | Počet relevantních pasáží k vrácení                                                                  |
-| `includeCitations` | boolean | ❌ Ne    | false   | Zahrnout citations do odpovědi                                                                       |
-| `includeCosts`     | boolean | ❌ Ne    | false   | Zahrnout cost informace do odpovědi                                                                  |
-| `includeMarkdown`  | boolean | ❌ Ne    | true    | Vrátit odpověď s markdown formátováním (false = plain text)                                          |
+| Parametr           | Typ     | Povinný  | Výchozí | Popis                                                                                                                             |
+| ------------------ | ------- | -------- | ------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `query`            | string  | ✅ Ano   | -       | Dotaz uživatele                                                                                                                   |
+| `websiteUrl`       | string  | ✅ Ano\* | -       | URL webu, na kterém API běží (\*povinný pouze při použití veřejného API režimu s `x-api-key` header)                              |
+| `k`                | number  | ❌ Ne    | 6       | Počet relevantních pasáží k vrácení                                                                                               |
+| `includeCitations` | boolean | ❌ Ne    | false   | Zahrnout citations do odpovědi                                                                                                    |
+| `includeCosts`     | boolean | ❌ Ne    | false   | Zahrnout cost informace do odpovědi                                                                                               |
+| `includeMarkdown`  | boolean | ❌ Ne    | false\* | Vrátit odpověď s markdown formátováním (false = plain text). \*Výchozí hodnota je `false` pro veřejné API, `true` pro interní API |
 
 ## Response
 
