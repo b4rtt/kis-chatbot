@@ -671,11 +671,14 @@ curl -X POST http://localhost:3000/api/ask \
 
 ## 🌐 Veřejné API
 
-Pro integraci chatbotu do externích aplikací je k dispozici veřejné API endpoint `/api/public/ask`.
+Endpoint `/api/ask` podporuje dva režimy:
 
-### Autentizace
+1. **Interní režim** (bez autentizace): Používá se pro frontend aplikaci
+2. **Veřejné API režim** (s autentizací): Pro externí integrace
 
-API vyžaduje autentizaci pomocí secret key, který se předává v hlavičce:
+### Autentizace (pouze pro veřejné API)
+
+Pro použití veřejného API je potřeba autentizace pomocí secret key, který se předává v hlavičce:
 
 - **Hlavička**: `x-api-key` nebo `Authorization: Bearer <key>`
 - **Proměnná prostředí**: `PUBLIC_API_KEY` (nastav v `.env.local`)
@@ -695,7 +698,7 @@ API je chráněno proti zneužití pomocí rate limitingu:
 ### Příklad použití
 
 ```bash
-curl -X POST https://esports-chatbot.vercel.app/api/public/ask \
+curl -X POST https://esports-chatbot.vercel.app/api/ask \
   -H "Content-Type: application/json" \
   -H "x-api-key: your_secret_key_here" \
   -d '{
@@ -811,7 +814,7 @@ Alternativně můžeš použít **Vercel Edge Middleware** s KV pro ještě lep�
 
 ```typescript
 async function askChatbot(query: string, websiteUrl: string) {
-  const response = await fetch('https://esports-chatbot.vercel.app/api/public/ask', {
+  const response = await fetch('https://esports-chatbot.vercel.app/api/ask', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

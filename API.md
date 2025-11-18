@@ -5,7 +5,7 @@ Tento dokument popisuje použití veřejného API pro integraci chatbotu do exte
 ## Endpoint
 
 ```
-POST /api/public/ask
+POST /api/ask
 ```
 
 ## Autentizace
@@ -55,7 +55,7 @@ x-api-key: your_secret_key_here
 | Parametr     | Typ     | Povinný | Výchozí | Popis                               |
 | ------------ | ------- | ------- | ------- | ----------------------------------- |
 | `query`      | string  | ✅ Ano  | -       | Dotaz uživatele                     |
-| `websiteUrl` | string  | ✅ Ano  | -       | URL webu, na kterém API běží        |
+| `websiteUrl` | string  | ✅ Ano* | -       | URL webu, na kterém API běží (*povinný pouze při použití veřejného API režimu s `x-api-key` header) |
 | `k`          | number  | ❌ Ne   | 6       | Počet relevantních pasáží k vrácení |
 | `localOnly`  | boolean | ❌ Ne   | true    | Použít pouze lokální LLM (Ollama)   |
 
@@ -137,7 +137,7 @@ Chyba serveru:
 ### cURL
 
 ```bash
-curl -X POST https://esports-chatbot.vercel.app/api/public/ask \
+curl -X POST https://esports-chatbot.vercel.app/api/ask \
   -H "Content-Type: application/json" \
   -H "x-api-key: your_secret_key_here" \
   -d '{
@@ -213,7 +213,7 @@ function useChatbotAPI(apiKey: string, websiteUrl: string) {
 
       try {
         const response = await fetch(
-          "https://esports-chatbot.vercel.app/api/public/ask",
+          "https://esports-chatbot.vercel.app/api/ask",
           {
             method: "POST",
             headers: {
@@ -292,7 +292,7 @@ import requests
 import time
 
 def ask_chatbot(query: str, website_url: str, api_key: str):
-    url = "https://esports-chatbot.vercel.app/api/public/ask"
+    url = "https://esports-chatbot.vercel.app/api/ask"
     headers = {
         "Content-Type": "application/json",
         "x-api-key": api_key,

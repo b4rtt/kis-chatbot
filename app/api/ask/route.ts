@@ -7,6 +7,7 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 const INPUT_PRICE = Number(process.env.OPENAI_INPUT_PRICE_PER_1K ?? "0.00015");
 const OUTPUT_PRICE = Number(process.env.OPENAI_OUTPUT_PRICE_PER_1K ?? "0.0006");
+const PUBLIC_API_KEY = process.env.PUBLIC_API_KEY || "";
 const RATE_LIMIT_MAX_REQUESTS = Number(process.env.RATE_LIMIT_MAX_REQUESTS ?? "20");
 const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000; // 10 minut
 
@@ -63,113 +64,168 @@ return data.response as string;
 }
 
 export async function POST(req: NextRequest) {
-  // Rate limiting
-  const identifier = getIdentifier(req);
-  const rateLimit = checkRateLimit(identifier, RATE_LIMIT_MAX_REQUESTS, RATE_LIMIT_WINDOW_MS);
-  
-  if (!rateLimit.allowed) {
-    const resetDate = new Date(rateLimit.resetAt);
-    return NextResponse.json(
-      {
-        error: "Too Many Requests",
-        message: `Rate limit exceeded. Maximum ${RATE_LIMIT_MAX_REQUESTS} requests per 10 minutes.`,
-        resetAt: resetDate.toISOString(),
-      },
-      {
-        status: 429,
+  try {
+    // 1. Kontrola autentizace pro veřejné API (pokud je poslán x-api-key)
+    const apiKey = req.headers.get("x-api-key") || req.headers.get("authorization")?.replace("Bearer ", "");
+    const isPublicAPI = !!apiKey;
+    
+    if (isPublicAPI) {
+      if (!PUBLIC_API_KEY || apiKey !== PUBLIC_API_KEY) {
+        return NextResponse.json(
+          { error: "Unauthorized", message: "Invalid or missing API key" },
+          { status: 401 }
+        );
+      }
+    }
+
+    // 2. Rate limiting
+    const identifier = getIdentifier(req);
+    const rateLimit = checkRateLimit(identifier, RATE_LIMIT_MAX_REQUESTS, RATE_LIMIT_WINDOW_MS);
+    
+    if (!rateLimit.allowed) {
+      const resetDate = new Date(rateLimit.resetAt);
+      return NextResponse.json(
+        {
+          error: "Too Many Requests",
+          message: `Rate limit exceeded. Maximum ${RATE_LIMIT_MAX_REQUESTS} requests per 10 minutes.`,
+          resetAt: resetDate.toISOString(),
+        },
+        {
+          status: 429,
+          headers: {
+            "X-RateLimit-Limit": String(RATE_LIMIT_MAX_REQUESTS),
+            "X-RateLimit-Remaining": String(rateLimit.remaining),
+            "X-RateLimit-Reset": String(rateLimit.resetAt),
+            "Retry-After": String(Math.ceil((rateLimit.resetAt - Date.now()) / 1000)),
+          },
+        }
+      );
+    }
+
+    // 3. Parsování těla požadavku
+    const body = await req.json();
+    const { query, websiteUrl, k = 6, localOnly = true } = body;
+
+    // 4. Validace povinných parametrů
+    if (!query) {
+      return NextResponse.json(
+        { error: "Bad Request", message: "Missing required parameter: query" },
+        { status: 400 }
+      );
+    }
+
+    // Pro veřejné API je websiteUrl povinný
+    if (isPublicAPI) {
+      if (!websiteUrl) {
+        return NextResponse.json(
+          { error: "Bad Request", message: "Missing required parameter: websiteUrl" },
+          { status: 400 }
+        );
+      }
+
+      // Validace URL formátu
+      try {
+        new URL(websiteUrl);
+      } catch {
+        return NextResponse.json(
+          { error: "Bad Request", message: "Invalid URL format in websiteUrl parameter" },
+          { status: 400 }
+        );
+      }
+    }
+
+    // 5. Zpracování dotazu
+    const { embedTexts } = await import("@/lib/localEmbeddings");
+    const [qvec] = await embedTexts([query]);
+
+    const index = await loadIndex();
+    const items = index?.items ?? [];
+    const vectorPassages = topK(qvec, items, Number(k) || 6);
+    const keywordPassages = keywordSearch(query, items, 3);
+    const merged = [...vectorPassages];
+    for (const candidate of keywordPassages) {
+      if (!merged.find((p) => p.id === candidate.id)) {
+        merged.push(candidate);
+      }
+    }
+    const passages = merged.slice(0, Number(k) || 6);
+
+    if (!passages.length) {
+      return NextResponse.json({
+        answer: null,
+        citations: [],
+        cost: zeroCost,
+      }, {
         headers: {
           "X-RateLimit-Limit": String(RATE_LIMIT_MAX_REQUESTS),
           "X-RateLimit-Remaining": String(rateLimit.remaining),
           "X-RateLimit-Reset": String(rateLimit.resetAt),
-          "Retry-After": String(Math.ceil((rateLimit.resetAt - Date.now()) / 1000)),
         },
-      }
-    );
-  }
+      });
+    }
 
-const { query, k = 6, localOnly = true } = await req.json();
-if (!query) return NextResponse.json({ error: "Missing query parameter" }, { status: 400 });
+    const context = passages.map((p, i) => `[#${i + 1}] ${p.file}\n---\n${p.content}`).join("\n\n");
+    const sys = "Odpovídej pouze z dodaného kontextu. Když informace chybí, řekni 'Není v dokumentaci.' Buď stručný a odpověď zakonči citacemi ve formátu [#].";
+    const prompt = `${sys}\n\nQuestion: ${query}\n\nContext:\n${context}`;
 
-// Local query embedding
-const { embedTexts } = await import("@/lib/localEmbeddings");
-const [qvec] = await embedTexts([query]);
-
-// Retrieve top-K chunks
-const index = await loadIndex();
-const items = index?.items ?? [];
-const vectorPassages = topK(qvec, items, Number(k) || 6);
-const keywordPassages = keywordSearch(query, items, 3);
-const merged = [...vectorPassages];
-for (const candidate of keywordPassages) {
-  if (!merged.find((p) => p.id === candidate.id)) {
-    merged.push(candidate);
-  }
-}
-const passages = merged.slice(0, Number(k) || 6);
-if (!passages.length) {
-  return NextResponse.json({
-    answer: null,
-    citations: [],
-    cost: zeroCost,
-  });
-}
-const context = passages.map((p,i)=>`[#${i+1}] ${p.file}\n---\n${p.content}`).join("\n\n");
-
-const sys = "Odpovídej pouze z dodaného kontextu. Když informace chybí, řekni 'Není v dokumentaci.' Buď stručný a odpověď zakonči citacemi ve formátu [#].";
-const prompt = `${sys}\n\nQuestion: ${query}\n\nContext:\n${context}`;
-
-// Confidence threshold (optional)
-const maxScore = vectorPassages[0]?.score ?? 0;
-if (maxScore < 0.28 && !localOnly && process.env.OPENAI_API_KEY) {
-  // fallback to cloud for tricky queries
-  const chat = await openai.chat.completions.create({
-    model: OPENAI_MODEL,
-    temperature: 0.2,
-    messages: [
-      { role: "system", content: sys },
-      { role: "user", content: prompt },
-    ],
-  });
-  const cost = summarizeCost(chat.usage ?? undefined);
-  const rawAnswer = chat.choices[0].message.content ?? "";
-  const answer = formatAnswer(rawAnswer);
-  return NextResponse.json({
-    answer,
-    citations: passages.map((p,i)=>({ id:i+1, file:p.file, idx:p.idx, score:p.score })),
-    cost,
-  }, {
-    headers: {
+    const maxScore = vectorPassages[0]?.score ?? 0;
+    const rateLimitHeaders = {
       "X-RateLimit-Limit": String(RATE_LIMIT_MAX_REQUESTS),
       "X-RateLimit-Remaining": String(rateLimit.remaining),
       "X-RateLimit-Reset": String(rateLimit.resetAt),
-    },
-  });
-}
+    };
 
-// Local generation (Ollama) or cloud if localOnly=false and OPENAI_API_KEY set
-let answer: string | null;
-let cost = zeroCost;
-if (localOnly) {
-  answer = formatAnswer(await generateLocal(prompt));
-} else {
-  const chat = await openai.chat.completions.create({
-    model: OPENAI_MODEL,
-    temperature: 0.2,
-    messages: [{ role: "system", content: sys }, { role: "user", content: prompt }],
-  });
-  cost = summarizeCost(chat.usage ?? undefined);
-  answer = formatAnswer(chat.choices[0].message.content ?? "");
-}
+    // Confidence threshold (optional)
+    if (maxScore < 0.28 && !localOnly && process.env.OPENAI_API_KEY) {
+      // fallback to cloud for tricky queries
+      const chat = await openai.chat.completions.create({
+        model: OPENAI_MODEL,
+        temperature: 0.2,
+        messages: [
+          { role: "system", content: sys },
+          { role: "user", content: prompt },
+        ],
+      });
+      const cost = summarizeCost(chat.usage ?? undefined);
+      const rawAnswer = chat.choices[0].message.content ?? "";
+      const answer = formatAnswer(rawAnswer);
+      return NextResponse.json({
+        answer,
+        citations: passages.map((p, i) => ({ id: i + 1, file: p.file, idx: p.idx, score: p.score })),
+        cost,
+      }, {
+        headers: rateLimitHeaders,
+      });
+    }
 
-return NextResponse.json({
-  answer,
-  citations: passages.map((p,i)=>({ id:i+1, file:p.file, idx:p.idx, score:p.score })),
-  cost,
-}, {
-  headers: {
-    "X-RateLimit-Limit": String(RATE_LIMIT_MAX_REQUESTS),
-    "X-RateLimit-Remaining": String(rateLimit.remaining),
-    "X-RateLimit-Reset": String(rateLimit.resetAt),
-  },
-});
+    // Local generation (Ollama) or cloud if localOnly=false and OPENAI_API_KEY set
+    let answer: string | null;
+    let cost = zeroCost;
+    if (localOnly) {
+      answer = formatAnswer(await generateLocal(prompt));
+    } else {
+      const chat = await openai.chat.completions.create({
+        model: OPENAI_MODEL,
+        temperature: 0.2,
+        messages: [{ role: "system", content: sys }, { role: "user", content: prompt }],
+      });
+      cost = summarizeCost(chat.usage ?? undefined);
+      answer = formatAnswer(chat.choices[0].message.content ?? "");
+    }
+
+    return NextResponse.json({
+      answer,
+      citations: passages.map((p, i) => ({ id: i + 1, file: p.file, idx: p.idx, score: p.score })),
+      cost,
+    }, {
+      headers: rateLimitHeaders,
+    });
+  } catch (error) {
+    console.error("API error:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json(
+      { error: "Internal Server Error", message: errorMessage },
+      { status: 500 }
+    );
+  }
 }
