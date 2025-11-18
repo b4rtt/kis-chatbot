@@ -18,11 +18,13 @@ API vyžaduje autentizaci pomocí secret key. Klíč se předává v HTTP hlavi�
 ## Rate Limiting
 
 API je chráněno proti zneužití pomocí rate limitingu:
+
 - **Limit**: 20 požadavků za 10 minut (nastavitelné)
 - **Okno**: 10 minut (fixní)
 - **Identifikace**: Podle IP adresy klienta
 
 API vrací informace o rate limitu v hlavičkách:
+
 - `X-RateLimit-Limit`: Maximální počet požadavků
 - `X-RateLimit-Remaining`: Zbývající počet požadavků
 - `X-RateLimit-Reset`: Unix timestamp, kdy se limit resetuje
@@ -50,12 +52,12 @@ x-api-key: your_secret_key_here
 
 ### Parametry
 
-| Parametr | Typ | Povinný | Výchozí | Popis |
-|----------|-----|---------|---------|-------|
-| `query` | string | ✅ Ano | - | Dotaz uživatele |
-| `websiteUrl` | string | ✅ Ano | - | URL webu, na kterém API běží |
-| `k` | number | ❌ Ne | 6 | Počet relevantních pasáží k vrácení |
-| `localOnly` | boolean | ❌ Ne | true | Použít pouze lokální LLM (Ollama) |
+| Parametr     | Typ     | Povinný | Výchozí | Popis                               |
+| ------------ | ------- | ------- | ------- | ----------------------------------- |
+| `query`      | string  | ✅ Ano  | -       | Dotaz uživatele                     |
+| `websiteUrl` | string  | ✅ Ano  | -       | URL webu, na kterém API běží        |
+| `k`          | number  | ❌ Ne   | 6       | Počet relevantních pasáží k vrácení |
+| `localOnly`  | boolean | ❌ Ne   | true    | Použít pouze lokální LLM (Ollama)   |
 
 ## Response
 
@@ -139,7 +141,7 @@ curl -X POST https://esports-chatbot.vercel.app/api/public/ask \
   -H "Content-Type: application/json" \
   -H "x-api-key: your_secret_key_here" \
   -d '{
-    "query": "Jak resetovat heslo?",
+    "query": "Kdo je Adam Joska?",
     "websiteUrl": "https://example.com",
     "k": 6,
     "localOnly": false
@@ -150,27 +152,32 @@ curl -X POST https://esports-chatbot.vercel.app/api/public/ask \
 
 ```typescript
 async function askChatbot(query: string, websiteUrl: string) {
-  const response = await fetch('https://esports-chatbot.vercel.app/api/public/ask', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': 'your_secret_key_here',
-    },
-    body: JSON.stringify({
-      query,
-      websiteUrl,
-      k: 6,
-      localOnly: false,
-    }),
-  });
+  const response = await fetch(
+    "https://esports-chatbot.vercel.app/api/public/ask",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": "your_secret_key_here",
+      },
+      body: JSON.stringify({
+        query,
+        websiteUrl,
+        k: 6,
+        localOnly: false,
+      }),
+    }
+  );
 
   if (!response.ok) {
     if (response.status === 429) {
-      const retryAfter = response.headers.get('Retry-After');
-      throw new Error(`Rate limit exceeded. Retry after ${retryAfter} seconds.`);
+      const retryAfter = response.headers.get("Retry-After");
+      throw new Error(
+        `Rate limit exceeded. Retry after ${retryAfter} seconds.`
+      );
     }
     const error = await response.json();
-    throw new Error(error.message || 'API request failed');
+    throw new Error(error.message || "API request failed");
   }
 
   const data = await response.json();
@@ -179,73 +186,87 @@ async function askChatbot(query: string, websiteUrl: string) {
 
 // Použití
 try {
-  const result = await askChatbot('Jak resetovat heslo?', 'https://example.com');
+  const result = await askChatbot(
+    "Jak resetovat heslo?",
+    "https://example.com"
+  );
   console.log(result.answer);
-  console.log('Citace:', result.citations);
+  console.log("Citace:", result.citations);
 } catch (error) {
-  console.error('Chyba:', error);
+  console.error("Chyba:", error);
 }
 ```
 
 ### React Hook
 
 ```typescript
-import { useState, useCallback } from 'react';
+import { useState, useCallback } from "react";
 
 function useChatbotAPI(apiKey: string, websiteUrl: string) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const ask = useCallback(async (query: string) => {
-    setLoading(true);
-    setError(null);
+  const ask = useCallback(
+    async (query: string) => {
+      setLoading(true);
+      setError(null);
 
-    try {
-      const response = await fetch('https://esports-chatbot.vercel.app/api/public/ask', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-        },
-        body: JSON.stringify({
-          query,
-          websiteUrl,
-          k: 6,
-          localOnly: false,
-        }),
-      });
+      try {
+        const response = await fetch(
+          "https://esports-chatbot.vercel.app/api/public/ask",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-api-key": apiKey,
+            },
+            body: JSON.stringify({
+              query,
+              websiteUrl,
+              k: 6,
+              localOnly: false,
+            }),
+          }
+        );
 
-      if (!response.ok) {
-        if (response.status === 429) {
-          const retryAfter = response.headers.get('Retry-After');
-          throw new Error(`Rate limit exceeded. Retry after ${retryAfter} seconds.`);
+        if (!response.ok) {
+          if (response.status === 429) {
+            const retryAfter = response.headers.get("Retry-After");
+            throw new Error(
+              `Rate limit exceeded. Retry after ${retryAfter} seconds.`
+            );
+          }
+          const errorData = await response.json();
+          throw new Error(errorData.message || "API request failed");
         }
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'API request failed');
-      }
 
-      const data = await response.json();
-      return data;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      setError(message);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, [apiKey, websiteUrl]);
+        const data = await response.json();
+        return data;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unknown error";
+        setError(message);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [apiKey, websiteUrl]
+  );
 
   return { ask, loading, error };
 }
 
 // Použití v komponentě
 function ChatComponent() {
-  const { ask, loading, error } = useChatbotAPI('your_secret_key', 'https://example.com');
+  const { ask, loading, error } = useChatbotAPI(
+    "your_secret_key",
+    "https://example.com"
+  );
   const [answer, setAnswer] = useState<string | null>(null);
 
   const handleAsk = async () => {
     try {
-      const result = await ask('Jak resetovat heslo?');
+      const result = await ask("Jak resetovat heslo?");
       setAnswer(result.answer);
     } catch (err) {
       console.error(err);
@@ -255,9 +276,9 @@ function ChatComponent() {
   return (
     <div>
       <button onClick={handleAsk} disabled={loading}>
-        {loading ? 'Načítám...' : 'Zeptat se'}
+        {loading ? "Načítám..." : "Zeptat se"}
       </button>
-      {error && <div style={{ color: 'red' }}>{error}</div>}
+      {error && <div style={{ color: "red" }}>{error}</div>}
       {answer && <div>{answer}</div>}
     </div>
   );
@@ -282,13 +303,13 @@ def ask_chatbot(query: str, website_url: str, api_key: str):
         "k": 6,
         "localOnly": False,
     }
-    
+
     response = requests.post(url, json=data, headers=headers)
-    
+
     if response.status_code == 429:
         retry_after = response.headers.get("Retry-After")
         raise Exception(f"Rate limit exceeded. Retry after {retry_after} seconds.")
-    
+
     response.raise_for_status()
     return response.json()
 
@@ -311,4 +332,3 @@ except Exception as e:
 ## Podpora
 
 Pro dotazy a podporu kontaktujte tým technické podpory.
-
