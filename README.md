@@ -718,6 +718,7 @@ curl -X POST https://esports-chatbot.vercel.app/api/ask \
 **Volitelné:**
 - `k` (number, výchozí: 6): Počet relevantních pasáží k vrácení
 - `localOnly` (boolean, výchozí: true): Použít pouze lokální LLM (Ollama), nebo povolit fallback na cloudový model
+- `includeCitations` (boolean, výchozí: false): Zahrnout citations do odpovědi (frontend automaticky posílá `true`)
 
 ### Odpověď
 

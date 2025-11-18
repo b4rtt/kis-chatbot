@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
 
     // 3. Parsování těla požadavku
     const body = await req.json();
-    const { query, websiteUrl, k = 6, localOnly = true } = body;
+    const { query, websiteUrl, k = 6, localOnly = true, includeCitations = false } = body;
 
     // 4. Validace povinných parametrů
     if (!query) {
@@ -151,11 +151,14 @@ export async function POST(req: NextRequest) {
     const passages = merged.slice(0, Number(k) || 6);
 
     if (!passages.length) {
-      return NextResponse.json({
+      const response: any = {
         answer: null,
-        citations: [],
         cost: zeroCost,
-      }, {
+      };
+      if (includeCitations) {
+        response.citations = [];
+      }
+      return NextResponse.json(response, {
         headers: {
           "X-RateLimit-Limit": String(RATE_LIMIT_MAX_REQUESTS),
           "X-RateLimit-Remaining": String(rateLimit.remaining),
@@ -189,11 +192,14 @@ export async function POST(req: NextRequest) {
       const cost = summarizeCost(chat.usage ?? undefined);
       const rawAnswer = chat.choices[0].message.content ?? "";
       const answer = formatAnswer(rawAnswer);
-      return NextResponse.json({
+      const response: any = {
         answer,
-        citations: passages.map((p, i) => ({ id: i + 1, file: p.file, idx: p.idx, score: p.score })),
         cost,
-      }, {
+      };
+      if (includeCitations) {
+        response.citations = passages.map((p, i) => ({ id: i + 1, file: p.file, idx: p.idx, score: p.score }));
+      }
+      return NextResponse.json(response, {
         headers: rateLimitHeaders,
       });
     }
@@ -213,11 +219,14 @@ export async function POST(req: NextRequest) {
       answer = formatAnswer(chat.choices[0].message.content ?? "");
     }
 
-    return NextResponse.json({
+    const response: any = {
       answer,
-      citations: passages.map((p, i) => ({ id: i + 1, file: p.file, idx: p.idx, score: p.score })),
       cost,
-    }, {
+    };
+    if (includeCitations) {
+      response.citations = passages.map((p, i) => ({ id: i + 1, file: p.file, idx: p.idx, score: p.score }));
+    }
+    return NextResponse.json(response, {
       headers: rateLimitHeaders,
     });
   } catch (error) {

@@ -58,7 +58,7 @@ export function useChatController(options: UseChatOptions = {}) {
       const r = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: question, localOnly }),
+        body: JSON.stringify({ query: question, localOnly, includeCitations: true }),
       });
       if (!r.ok) {
         const err = await r.json().catch(() => ({}));

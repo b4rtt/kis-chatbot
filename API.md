@@ -52,16 +52,19 @@ x-api-key: your_secret_key_here
 
 ### Parametry
 
-| Parametr     | Typ     | Povinný  | Výchozí | Popis                                                                                                |
-| ------------ | ------- | -------- | ------- | ---------------------------------------------------------------------------------------------------- |
-| `query`      | string  | ✅ Ano   | -       | Dotaz uživatele                                                                                      |
-| `websiteUrl` | string  | ✅ Ano\* | -       | URL webu, na kterém API běží (\*povinný pouze při použití veřejného API režimu s `x-api-key` header) |
-| `k`          | number  | ❌ Ne    | 6       | Počet relevantních pasáží k vrácení                                                                  |
-| `localOnly`  | boolean | ❌ Ne    | true    | Použít pouze lokální LLM (Ollama)                                                                    |
+| Parametr           | Typ     | Povinný  | Výchozí | Popis                                                                                                |
+| ------------------ | ------- | -------- | ------- | ---------------------------------------------------------------------------------------------------- |
+| `query`            | string  | ✅ Ano   | -       | Dotaz uživatele                                                                                      |
+| `websiteUrl`       | string  | ✅ Ano\* | -       | URL webu, na kterém API běží (\*povinný pouze při použití veřejného API režimu s `x-api-key` header) |
+| `k`                | number  | ❌ Ne    | 6       | Počet relevantních pasáží k vrácení                                                                  |
+| `localOnly`        | boolean | ❌ Ne    | true    | Použít pouze lokální LLM (Ollama)                                                                    |
+| `includeCitations` | boolean | ❌ Ne    | false   | Zahrnout citations do odpovědi                                                                       |
 
 ## Response
 
 ### Úspěšná odpověď (200 OK)
+
+**S citations** (`includeCitations: true`):
 
 ```json
 {
@@ -74,6 +77,22 @@ x-api-key: your_secret_key_here
       "score": 0.85
     }
   ],
+  "cost": {
+    "usd": 0.0001,
+    "tokens": {
+      "prompt": 150,
+      "completion": 50,
+      "total": 200
+    }
+  }
+}
+```
+
+**Bez citations** (`includeCitations: false` nebo parametr není poslán, výchozí):
+
+```json
+{
+  "answer": "Pro resetování hesla navštivte stránku...",
   "cost": {
     "usd": 0.0001,
     "tokens": {
