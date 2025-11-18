@@ -56,6 +56,7 @@ x-api-key: your_secret_key_here
 | `websiteUrl`       | string  | ✅ Ano\* | -       | URL webu, na kterém API běží (\*povinný pouze při použití veřejného API režimu s `x-api-key` header) |
 | `k`                | number  | ❌ Ne    | 6       | Počet relevantních pasáží k vrácení                                                                  |
 | `includeCitations` | boolean | ❌ Ne    | false   | Zahrnout citations do odpovědi                                                                       |
+| `includeCosts`     | boolean | ❌ Ne    | false   | Zahrnout cost informace do odpovědi                                                                 |
 
 ## Response
 
@@ -87,6 +88,13 @@ x-api-key: your_secret_key_here
 
 **Bez citations** (`includeCitations: false` nebo parametr není poslán, výchozí):
 
+```json
+{
+  "answer": "Pro resetování hesla navštivte stránku..."
+}
+```
+
+**S costs** (`includeCosts: true`):
 ```json
 {
   "answer": "Pro resetování hesla navštivte stránku...",

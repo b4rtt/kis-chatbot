@@ -692,6 +692,7 @@ curl -X POST https://esports-chatbot.vercel.app/api/ask \
 **Volitelné:**
 - `k` (number, výchozí: 6): Počet relevantních pasáží k vrácení
 - `includeCitations` (boolean, výchozí: false): Zahrnout citations do odpovědi (frontend automaticky posílá `true`)
+- `includeCosts` (boolean, výchozí: false): Zahrnout cost informace do odpovědi (frontend automaticky posílá `true`)
 
 ### Odpověď
 

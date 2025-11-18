@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
 
     // 3. Parsování těla požadavku
     const body = await req.json();
-    const { query, websiteUrl, k = 6, includeCitations = false } = body;
+    const { query, websiteUrl, k = 6, includeCitations = false, includeCosts = false } = body;
 
     // 4. Validace povinných parametrů
     if (!query) {
@@ -140,8 +140,10 @@ export async function POST(req: NextRequest) {
     if (!passages.length) {
       const response: any = {
         answer: null,
-        cost: zeroCost,
       };
+      if (includeCosts) {
+        response.cost = zeroCost;
+      }
       if (includeCitations) {
         response.citations = [];
       }
@@ -181,7 +183,9 @@ export async function POST(req: NextRequest) {
       temperature: 0.2,
       messages: [{ role: "system", content: sys }, { role: "user", content: prompt }],
     });
-    const cost = summarizeCost(chat.usage ?? undefined);
+    
+    // Počítat cost pouze pokud je požadováno
+    const cost = includeCosts ? summarizeCost(chat.usage ?? undefined) : undefined;
     let answer = formatAnswer(chat.choices[0].message.content ?? "");
     
     // Pokud jsou vypnuté citace, odstraň všechny [#X] reference z odpovědi
@@ -191,8 +195,10 @@ export async function POST(req: NextRequest) {
 
     const response: any = {
       answer,
-      cost,
     };
+    if (includeCosts) {
+      response.cost = cost;
+    }
     if (includeCitations) {
       response.citations = passages.map((p, i) => ({ id: i + 1, file: p.file, idx: p.idx, score: p.score }));
     }
