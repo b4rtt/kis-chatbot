@@ -52,12 +52,12 @@ x-api-key: your_secret_key_here
 
 ### Parametry
 
-| Parametr     | Typ     | Povinný | Výchozí | Popis                               |
-| ------------ | ------- | ------- | ------- | ----------------------------------- |
-| `query`      | string  | ✅ Ano  | -       | Dotaz uživatele                     |
-| `websiteUrl` | string  | ✅ Ano* | -       | URL webu, na kterém API běží (*povinný pouze při použití veřejného API režimu s `x-api-key` header) |
-| `k`          | number  | ❌ Ne   | 6       | Počet relevantních pasáží k vrácení |
-| `localOnly`  | boolean | ❌ Ne   | true    | Použít pouze lokální LLM (Ollama)   |
+| Parametr     | Typ     | Povinný  | Výchozí | Popis                                                                                                |
+| ------------ | ------- | -------- | ------- | ---------------------------------------------------------------------------------------------------- |
+| `query`      | string  | ✅ Ano   | -       | Dotaz uživatele                                                                                      |
+| `websiteUrl` | string  | ✅ Ano\* | -       | URL webu, na kterém API běží (\*povinný pouze při použití veřejného API režimu s `x-api-key` header) |
+| `k`          | number  | ❌ Ne    | 6       | Počet relevantních pasáží k vrácení                                                                  |
+| `localOnly`  | boolean | ❌ Ne    | true    | Použít pouze lokální LLM (Ollama)                                                                    |
 
 ## Response
 
