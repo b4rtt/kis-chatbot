@@ -49,6 +49,38 @@ function formatAnswer(answer: string): string | null {
   return answer;
 }
 
+function stripMarkdown(text: string): string {
+  if (!text) return text;
+  
+  // Odstranit markdown syntaxi
+  return text
+    // Headers (# ## ###)
+    .replace(/^#{1,6}\s+(.+)$/gm, '$1')
+    // Bold (**text** nebo __text__)
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/__(.+?)__/g, '$1')
+    // Italic (*text* nebo _text_)
+    .replace(/\*(.+?)\*/g, '$1')
+    .replace(/_(.+?)_/g, '$1')
+    // Links [text](url)
+    .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
+    // Code blocks ```
+    .replace(/```[\s\S]*?```/g, '')
+    // Inline code `code`
+    .replace(/`([^`]+)`/g, '$1')
+    // Lists (- * +)
+    .replace(/^[\s]*[-*+]\s+(.+)$/gm, '$1')
+    // Numbered lists
+    .replace(/^\s*\d+\.\s+(.+)$/gm, '$1')
+    // Blockquotes (>)
+    .replace(/^>\s+(.+)$/gm, '$1')
+    // Horizontal rules (---)
+    .replace(/^---+$/gm, '')
+    // Clean up multiple spaces
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 
 export async function POST(req: NextRequest) {
   try {
@@ -91,7 +123,7 @@ export async function POST(req: NextRequest) {
 
     // 3. Parsování těla požadavku
     const body = await req.json();
-    const { query, websiteUrl, k = 6, includeCitations = false, includeCosts = false } = body;
+    const { query, websiteUrl, k = 6, includeCitations = false, includeCosts = false, includeMarkdown = true } = body;
 
     // 4. Validace povinných parametrů
     if (!query) {
@@ -191,6 +223,11 @@ export async function POST(req: NextRequest) {
     // Pokud jsou vypnuté citace, odstraň všechny [#X] reference z odpovědi
     if (!includeCitations && answer) {
       answer = answer.replace(/\s*\[#\d+\]\s*/g, " ").trim();
+    }
+    
+    // Pokud je vypnutý markdown, převeď na plain text
+    if (!includeMarkdown && answer) {
+      answer = stripMarkdown(answer);
     }
 
     const response: any = {

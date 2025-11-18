@@ -57,6 +57,7 @@ x-api-key: your_secret_key_here
 | `k`                | number  | ❌ Ne    | 6       | Počet relevantních pasáží k vrácení                                                                  |
 | `includeCitations` | boolean | ❌ Ne    | false   | Zahrnout citations do odpovědi                                                                       |
 | `includeCosts`     | boolean | ❌ Ne    | false   | Zahrnout cost informace do odpovědi                                                                  |
+| `includeMarkdown`  | boolean | ❌ Ne    | true    | Vrátit odpověď s markdown formátováním (false = plain text)                                          |
 
 ## Response
 
@@ -107,6 +108,22 @@ x-api-key: your_secret_key_here
       "total": 200
     }
   }
+}
+```
+
+**Bez markdown** (`includeMarkdown: false`):
+
+```json
+{
+  "answer": "Pro resetování hesla navštivte stránku s resetem hesla. Najdete tam formulář pro zadání emailu."
+}
+```
+
+**S markdown** (`includeMarkdown: true` nebo parametr není poslán, výchozí):
+
+```json
+{
+  "answer": "Pro resetování hesla navštivte **stránku s resetem hesla**. Najdete tam formulář pro zadání emailu."
 }
 ```
 

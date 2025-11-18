@@ -504,7 +504,11 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
 export async function POST(req: NextRequest) {
   const { query, k = 6, includeCitations = false } = await req.json();
-  if (!query) return NextResponse.json({ error: "Missing query parameter" }, { status: 400 });
+  if (!query)
+    return NextResponse.json(
+      { error: "Missing query parameter" },
+      { status: 400 }
+    );
 
   const { embedTexts } = await import("@/lib/localEmbeddings");
   const [qvec] = await embedTexts([query]);
@@ -519,29 +523,43 @@ export async function POST(req: NextRequest) {
   }
   const passages = merged.slice(0, Number(k) || 6);
   if (!passages.length) {
-    const response: any = { answer: null, cost: { usd: 0, tokens: { prompt: 0, completion: 0, total: 0 } } };
+    const response: any = {
+      answer: null,
+      cost: { usd: 0, tokens: { prompt: 0, completion: 0, total: 0 } },
+    };
     if (includeCitations) response.citations = [];
     return NextResponse.json(response);
   }
 
-  const context = passages.map((p,i)=>`[#${i+1}] ${p.file}\n---\n${p.content}`).join("\n\n");
-  const sys = "Odpovídej pouze z dodaného kontextu. Když informace chybí, řekni 'Není v dokumentaci.' Buď stručný a odpověď zakonči citacemi ve formátu [#].";
+  const context = passages
+    .map((p, i) => `[#${i + 1}] ${p.file}\n---\n${p.content}`)
+    .join("\n\n");
+  const sys =
+    "Odpovídej pouze z dodaného kontextu. Když informace chybí, řekni 'Není v dokumentaci.' Buď stručný a odpověď zakonči citacemi ve formátu [#].";
   const prompt = `${sys}\n\nQuestion: ${query}\n\nContext:\n${context}`;
 
   const chat = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     temperature: 0.2,
-    messages: [{ role: "system", content: sys }, { role: "user", content: prompt }],
+    messages: [
+      { role: "system", content: sys },
+      { role: "user", content: prompt },
+    ],
   });
-  
+
   const cost = summarizeCost(chat.usage ?? undefined);
   const answer = formatAnswer(chat.choices[0].message.content ?? "");
-  
+
   const response: any = { answer, cost };
   if (includeCitations) {
-    response.citations = passages.map((p,i)=>({ id:i+1, file:p.file, idx:p.idx, score:p.score }));
+    response.citations = passages.map((p, i) => ({
+      id: i + 1,
+      file: p.file,
+      idx: p.idx,
+      score: p.score,
+    }));
   }
-  
+
   return NextResponse.json(response);
 }
 ```
@@ -661,6 +679,7 @@ Pro použití veřejného API je potřeba autentizace pomocí secret key, který
 ### Rate Limiting
 
 API je chráněno proti zneužití pomocí rate limitingu:
+
 - **Limit**: Výchozí hodnota je 20 požadavků za 10 minut (nastavitelné přes `RATE_LIMIT_MAX_REQUESTS`)
 - **Okno**: 10 minut (fixní)
 - **Identifikace**: Podle IP adresy klienta
@@ -686,13 +705,16 @@ curl -X POST https://esports-chatbot.vercel.app/api/ask \
 ### Parametry
 
 **Povinné:**
+
 - `query` (string): Dotaz uživatele
 - `websiteUrl` (string): URL webu, na kterém API běží (používá se pro validaci a tracking)
 
 **Volitelné:**
+
 - `k` (number, výchozí: 6): Počet relevantních pasáží k vrácení
 - `includeCitations` (boolean, výchozí: false): Zahrnout citations do odpovědi (frontend automaticky posílá `true`)
 - `includeCosts` (boolean, výchozí: false): Zahrnout cost informace do odpovědi (frontend automaticky posílá `true`)
+- `includeMarkdown` (boolean, výchozí: true): Vrátit odpověď s markdown formátováním (false = plain text, frontend automaticky posílá `true`)
 
 ### Odpověď
 
@@ -721,6 +743,7 @@ curl -X POST https://esports-chatbot.vercel.app/api/ask \
 ### Chybové odpovědi
 
 **401 Unauthorized** - Neplatný nebo chybějící API klíč:
+
 ```json
 {
   "error": "Unauthorized",
@@ -729,6 +752,7 @@ curl -X POST https://esports-chatbot.vercel.app/api/ask \
 ```
 
 **400 Bad Request** - Chybějící nebo neplatné parametry:
+
 ```json
 {
   "error": "Bad Request",
@@ -737,6 +761,7 @@ curl -X POST https://esports-chatbot.vercel.app/api/ask \
 ```
 
 **429 Too Many Requests** - Překročen rate limit:
+
 ```json
 {
   "error": "Too Many Requests",
@@ -781,6 +806,7 @@ Pro spolehlivý rate limiting na Vercelu použij **Vercel KV** (key-value store)
 Alternativně můžeš použít **Vercel Edge Middleware** s KV pro ještě lepší výkon.
 
 **Aktuální identifikace:**
+
 - Kombinace IP adresy + User-Agent hash
 - Lepší než jen IP (sníží problém se sdílenými IP za NAT/proxy)
 - Pro ještě lepší identifikaci použij session cookie nebo user ID
@@ -789,11 +815,11 @@ Alternativně můžeš použít **Vercel Edge Middleware** s KV pro ještě lep�
 
 ```typescript
 async function askChatbot(query: string, websiteUrl: string) {
-  const response = await fetch('https://esports-chatbot.vercel.app/api/ask', {
-    method: 'POST',
+  const response = await fetch("https://esports-chatbot.vercel.app/api/ask", {
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': 'your_secret_key_here',
+      "Content-Type": "application/json",
+      "x-api-key": "your_secret_key_here",
     },
     body: JSON.stringify({
       query,
@@ -804,11 +830,13 @@ async function askChatbot(query: string, websiteUrl: string) {
 
   if (!response.ok) {
     if (response.status === 429) {
-      const retryAfter = response.headers.get('Retry-After');
-      throw new Error(`Rate limit exceeded. Retry after ${retryAfter} seconds.`);
+      const retryAfter = response.headers.get("Retry-After");
+      throw new Error(
+        `Rate limit exceeded. Retry after ${retryAfter} seconds.`
+      );
     }
     const error = await response.json();
-    throw new Error(error.message || 'API request failed');
+    throw new Error(error.message || "API request failed");
   }
 
   const data = await response.json();
@@ -817,14 +845,16 @@ async function askChatbot(query: string, websiteUrl: string) {
 
 // Použití
 try {
-  const result = await askChatbot('Jak resetovat heslo?', 'https://example.com');
+  const result = await askChatbot(
+    "Jak resetovat heslo?",
+    "https://example.com"
+  );
   console.log(result.answer);
-  console.log('Citace:', result.citations);
+  console.log("Citace:", result.citations);
 } catch (error) {
-  console.error('Chyba:', error);
+  console.error("Chyba:", error);
 }
 ```
-
 
 ## 🔒 Bezpečnost
 
