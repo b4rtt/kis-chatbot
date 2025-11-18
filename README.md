@@ -38,6 +38,10 @@ DOCS_BASE_URLS=https://docs.example.com,https://help.example.com # veřejné HTT
 DOCS_DIR=./docs
 ADMIN_KEY=super_secret_key
 
+# Veřejné API
+PUBLIC_API_KEY=your_secret_key_here
+RATE_LIMIT_MAX_REQUESTS=20 # počet požadavků za 10 minut (volitelné, výchozí: 20)
+
 # Volitelné pro hybridní režim (generování v cloudu):
 # OPENAI_API_KEY=sk-...
 
@@ -663,6 +667,157 @@ Dotaz:
 curl -X POST http://localhost:3000/api/ask \
   -H "Content-Type: application/json" \
   -d '{ "query": "How do I reset my password?" }'
+```
+
+## 🌐 Veřejné API
+
+Pro integraci chatbotu do externích aplikací je k dispozici veřejné API endpoint `/api/public/ask`.
+
+### Autentizace
+
+API vyžaduje autentizaci pomocí secret key, který se předává v hlavičce:
+
+- **Hlavička**: `x-api-key` nebo `Authorization: Bearer <key>`
+- **Proměnná prostředí**: `PUBLIC_API_KEY` (nastav v `.env.local`)
+
+### Rate Limiting
+
+API je chráněno proti zneužití pomocí rate limitingu:
+- **Limit**: Výchozí hodnota je 20 požadavků za 10 minut (nastavitelné přes `RATE_LIMIT_MAX_REQUESTS`)
+- **Okno**: 10 minut (fixní)
+- **Identifikace**: Podle IP adresy klienta
+- **Hlavičky**: API vrací informace o rate limitu v hlavičkách:
+  - `X-RateLimit-Limit`: Maximální počet požadavků
+  - `X-RateLimit-Remaining`: Zbývající počet požadavků
+  - `X-RateLimit-Reset`: Unix timestamp, kdy se limit resetuje
+  - `Retry-After`: Počet sekund do resetu (při překročení limitu)
+
+### Příklad použití
+
+```bash
+curl -X POST https://esports-chatbot.vercel.app/api/public/ask \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: your_secret_key_here" \
+  -d '{
+    "query": "Jak resetovat heslo?",
+    "websiteUrl": "https://example.com",
+    "k": 6,
+    "localOnly": false
+  }'
+```
+
+### Parametry
+
+**Povinné:**
+- `query` (string): Dotaz uživatele
+- `websiteUrl` (string): URL webu, na kterém API běží (používá se pro validaci a tracking)
+
+**Volitelné:**
+- `k` (number, výchozí: 6): Počet relevantních pasáží k vrácení
+- `localOnly` (boolean, výchozí: true): Použít pouze lokální LLM (Ollama), nebo povolit fallback na cloudový model
+
+### Odpověď
+
+```json
+{
+  "answer": "Odpověď na dotaz...",
+  "citations": [
+    {
+      "id": 1,
+      "file": "docs/faq.md",
+      "idx": 0,
+      "score": 0.85
+    }
+  ],
+  "cost": {
+    "usd": 0.0001,
+    "tokens": {
+      "prompt": 150,
+      "completion": 50,
+      "total": 200
+    }
+  }
+}
+```
+
+### Chybové odpovědi
+
+**401 Unauthorized** - Neplatný nebo chybějící API klíč:
+```json
+{
+  "error": "Unauthorized",
+  "message": "Neplatný nebo chybějící API klíč"
+}
+```
+
+**400 Bad Request** - Chybějící nebo neplatné parametry:
+```json
+{
+  "error": "Bad Request",
+  "message": "Chybí povinný parametr websiteUrl"
+}
+```
+
+**429 Too Many Requests** - Překročen rate limit:
+```json
+{
+  "error": "Too Many Requests",
+  "message": "Překročen limit požadavků. Maximálně 20 zpráv za 10 minut.",
+  "resetAt": "2024-01-01T12:00:00.000Z"
+}
+```
+
+### Nastavení proměnných prostředí
+
+Přidej do `.env.local`:
+
+```env
+# Veřejné API
+PUBLIC_API_KEY=your_secret_key_here
+
+# Rate limiting (volitelné, výchozí: 20)
+RATE_LIMIT_MAX_REQUESTS=20
+```
+
+### JavaScript/TypeScript příklad
+
+```typescript
+async function askChatbot(query: string, websiteUrl: string) {
+  const response = await fetch('https://esports-chatbot.vercel.app/api/public/ask', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': 'your_secret_key_here',
+    },
+    body: JSON.stringify({
+      query,
+      websiteUrl,
+      k: 6,
+      localOnly: false,
+    }),
+  });
+
+  if (!response.ok) {
+    if (response.status === 429) {
+      const retryAfter = response.headers.get('Retry-After');
+      throw new Error(`Rate limit exceeded. Retry after ${retryAfter} seconds.`);
+    }
+    const error = await response.json();
+    throw new Error(error.message || 'API request failed');
+  }
+
+  const data = await response.json();
+  return data;
+}
+
+// Použití
+try {
+  const result = await askChatbot('Jak resetovat heslo?', 'https://example.com');
+  console.log(result.answer);
+  console.log('Citace:', result.citations);
+} catch (error) {
+  console.error('Chyba:', error);
+}
 ```
 
 ## 🧱 Volitelně: Lokální LLM přes Ollamu
