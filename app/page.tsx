@@ -11,7 +11,8 @@ const PRIMARY = "#ff6200";
 
 export default function Page() {
   const [adminMode, setAdminMode] = useState(false);
-  const { q, setQ, msgs, loading, error, ask, totals } = useChatController({ admin: adminMode });
+  const [language, setLanguage] = useState("cs_CZ");
+  const { q, setQ, msgs, loading, error, ask, totals } = useChatController({ admin: adminMode, language });
   const [openSources, setOpenSources] = useState<{
     question: string;
     citations: Citation[];
@@ -67,6 +68,17 @@ export default function Page() {
           >
             <option value="user">Uživatel</option>
             <option value="admin">Admin</option>
+          </select>
+          <select
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+            className="language-select"
+          >
+            <option value="cs_CZ">Čeština</option>
+            <option value="en_US">English</option>
+            <option value="sk_SK">Slovenčina</option>
+            <option value="de_DE">Deutsch</option>
+            <option value="pl_PL">Polski</option>
           </select>
           <input
             value={q}
@@ -246,7 +258,8 @@ export default function Page() {
           gap: 12px;
           margin-top: 32px;
         }
-        .user-select {
+        .user-select,
+        .language-select {
           padding: 16px 20px;
           border-radius: 14px;
           border: 1px solid rgba(255, 255, 255, 0.12);
@@ -256,7 +269,8 @@ export default function Page() {
           cursor: pointer;
           min-width: 120px;
         }
-        .user-select option {
+        .user-select option,
+        .language-select option {
           background: #0d1220;
           color: #fff;
         }
@@ -522,7 +536,8 @@ export default function Page() {
           .composer {
             flex-direction: column;
           }
-          .user-select {
+          .user-select,
+          .language-select {
             width: 100%;
           }
           .composer button {

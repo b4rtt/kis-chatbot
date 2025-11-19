@@ -125,10 +125,23 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     // Pro veřejné API je výchozí includeMarkdown false (plain text), pro interní API true (markdown)
     const defaultIncludeMarkdown = isPublicAPI ? false : true;
-    const { query, websiteUrl, k = 6, includeCitations = false, includeCosts = false, includeMarkdown = defaultIncludeMarkdown, isAdmin } = body;
+    const { query, websiteUrl, k = 6, includeCitations = false, includeCosts = false, includeMarkdown = defaultIncludeMarkdown, isAdmin, language = "cs_CZ" } = body;
     
     // Určit idType: isAdmin="true" => idType=2 (admin), jinak idType=1 (user)
     const idType: 1 | 2 = (isAdmin === "true" || isAdmin === true) ? 2 : 1;
+    
+    // Extrahovat jazyk z locale (cs_CZ -> cs) pro zpětnou kompatibilitu
+    const languageCode = language.includes("_") ? language.split("_")[0] : language;
+    
+    // Mapování jazykových kódů na instrukce v angličtině
+    const languageInstructions: Record<string, string> = {
+      "cs": " Answer exclusively in Czech.",
+      "en": " Answer exclusively in English.",
+      "sk": " Answer exclusively in Slovak.",
+      "de": " Answer exclusively in German.",
+      "pl": " Answer exclusively in Polish.",
+    };
+    const languageInstruction = languageInstructions[languageCode] || languageInstructions["cs"];
 
     // 4. Validace povinných parametrů
     if (!query) {
@@ -198,9 +211,10 @@ export async function POST(req: NextRequest) {
       ? passages.map((p, i) => `[#${i + 1}] ${p.file}\n---\n${p.content}`).join("\n\n")
       : passages.map((p) => `${p.file}\n---\n${p.content}`).join("\n\n");
     
+    // Systémový prompt v angličtině s podporou jazyka odpovědi
     const sys = includeCitations
-      ? "Odpovídej pouze z dodaného kontextu. Když informace chybí, řekni 'Není v dokumentaci.' Buď stručný a odpověď zakonči citacemi ve formátu [#]."
-      : "Odpovídej pouze z dodaného kontextu. Když informace chybí, řekni 'Není v dokumentaci.' Buď stručný.";
+      ? `Answer only from the provided context. If information is missing, say 'Not in documentation.' Be concise and end your answer with citations in format [#].${languageInstruction}`
+      : `Answer only from the provided context. If information is missing, say 'Not in documentation.' Be concise.${languageInstruction}`;
     
     const prompt = `${sys}\n\nQuestion: ${query}\n\nContext:\n${context}`;
 

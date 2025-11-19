@@ -38,10 +38,11 @@ kis@esportsmedia.cz`;
 type UseChatOptions = {
   endpoint?: string;
   admin?: boolean;
+  language?: string;
 };
 
 export function useChatController(options: UseChatOptions = {}) {
-  const { endpoint = "/api/ask", admin = false } = options;
+  const { endpoint = "/api/ask", admin = false, language = "cs_CZ" } = options;
   const [q, setQ] = useState("");
   const [msgs, setMsgs] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -63,7 +64,8 @@ export function useChatController(options: UseChatOptions = {}) {
           includeCitations: true, 
           includeCosts: true, 
           includeMarkdown: true,
-          isAdmin: admin ? "true" : "false"
+          isAdmin: admin ? "true" : "false",
+          language: language
         }),
       });
       if (!r.ok) {
@@ -86,7 +88,7 @@ export function useChatController(options: UseChatOptions = {}) {
     } finally {
       setLoading(false);
     }
-  }, [endpoint, loading, q, admin]);
+  }, [endpoint, loading, q, admin, language]);
 
   const totals = useMemo(
     () =>
