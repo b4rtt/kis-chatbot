@@ -195,7 +195,7 @@ Chyba serveru:
 
 ```bash
 # User režim, čeština (výchozí)
-curl -X POST https://esports-chatbot.vercel.app/api/ask \
+curl -X POST https://kis-chatbot.vercel.app/api/ask \
   -H "Content-Type: application/json" \
   -H "x-api-key: your_secret_key_here" \
   -d '{
@@ -206,7 +206,7 @@ curl -X POST https://esports-chatbot.vercel.app/api/ask \
   }'
 
 # Admin režim, angličtina
-curl -X POST https://esports-chatbot.vercel.app/api/ask \
+curl -X POST https://kis-chatbot.vercel.app/api/ask \
   -H "Content-Type: application/json" \
   -H "x-api-key: your_secret_key_here" \
   -d '{
@@ -221,7 +221,7 @@ curl -X POST https://esports-chatbot.vercel.app/api/ask \
 
 ```typescript
 async function askChatbot(query: string, websiteUrl: string) {
-  const response = await fetch("https://esports-chatbot.vercel.app/api/ask", {
+  const response = await fetch("https://kis-chatbot.vercel.app/api/ask", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -279,23 +279,20 @@ function useChatbotAPI(apiKey: string, websiteUrl: string) {
       setError(null);
 
       try {
-        const response = await fetch(
-          "https://esports-chatbot.vercel.app/api/ask",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-api-key": apiKey,
-            },
-            body: JSON.stringify({
-              query,
-              websiteUrl,
-              isAdmin: "false",
-              language: "cs_CZ",
-              k: 6,
-            }),
-          }
-        );
+        const response = await fetch("https://kis-chatbot.vercel.app/api/ask", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": apiKey,
+          },
+          body: JSON.stringify({
+            query,
+            websiteUrl,
+            isAdmin: "false",
+            language: "cs_CZ",
+            k: 6,
+          }),
+        });
 
         if (!response.ok) {
           if (response.status === 429) {
@@ -360,7 +357,7 @@ import requests
 import time
 
 def ask_chatbot(query: str, website_url: str, api_key: str):
-    url = "https://esports-chatbot.vercel.app/api/ask"
+    url = "https://kis-chatbot.vercel.app/api/ask"
     headers = {
         "Content-Type": "application/json",
         "x-api-key": api_key,
