@@ -1,22 +1,27 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import {
-  useChatController,
-  Citation,
-} from "./components/useChatController";
+import { useChatController, Citation } from "./components/useChatController";
 
 const PRIMARY = "#ff6200";
 
 export default function Page() {
   const [adminMode, setAdminMode] = useState(false);
   const [language, setLanguage] = useState("cs_CZ");
-  const { q, setQ, msgs, loading, error, ask, totals } = useChatController({ admin: adminMode, language });
+  const { q, setQ, msgs, loading, error, ask, totals } = useChatController({
+    admin: adminMode,
+    language,
+  });
   const [openSources, setOpenSources] = useState<{
     question: string;
     citations: Citation[];
   } | null>(null);
+  const [serviceModalOpen, setServiceModalOpen] = useState(false);
+  const [adminKey, setAdminKey] = useState("");
+  const [serviceLoading, setServiceLoading] = useState(false);
+  const [serviceResult, setServiceResult] = useState<string | null>(null);
+  const [serviceError, setServiceError] = useState<string | null>(null);
 
   const totalUsd = totals.usd;
   const totalTokens = totals.tokens;
@@ -33,12 +38,119 @@ export default function Page() {
     }
   };
 
+  // Otevření servisního modalu pomocí kombinace kláves Cmd/Ctrl+Shift+S
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Podpora pro Mac (Cmd) i Windows/Linux (Ctrl)
+      const isModifierPressed = e.metaKey || e.ctrlKey;
+      if (isModifierPressed && e.shiftKey && e.key === "S") {
+        e.preventDefault();
+        setServiceModalOpen(true);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  const handleSync = async () => {
+    if (!adminKey.trim()) {
+      setServiceError("Zadejte admin klíč");
+      return;
+    }
+    setServiceLoading(true);
+    setServiceError(null);
+    setServiceResult(null);
+
+    try {
+      const response = await fetch("/api/admin/sync", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-key": adminKey,
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.error || "Synchronizace selhala");
+      }
+
+      const data = await response.json();
+      setServiceResult(
+        `✅ Synchronizace dokončena!\n\n` +
+          `User: ${data.user?.downloaded || 0} položek\n` +
+          `Admin: ${data.admin?.downloaded || 0} položek`
+      );
+    } catch (err) {
+      setServiceError(err instanceof Error ? err.message : "Něco se pokazilo");
+    } finally {
+      setServiceLoading(false);
+    }
+  };
+
+  const handleReindex = async (withSync: boolean = false) => {
+    if (!adminKey.trim()) {
+      setServiceError("Zadejte admin klíč");
+      return;
+    }
+    setServiceLoading(true);
+    setServiceError(null);
+    setServiceResult(null);
+
+    try {
+      const url = `/api/admin/reindex${withSync ? "?sync=1" : ""}`;
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-key": adminKey,
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.error || "Reindexace selhala");
+      }
+
+      const data = await response.json();
+      let result = "✅ Reindexace dokončena!\n\n";
+
+      if (data.user) {
+        result += `📋 User režim:\n`;
+        result += `   Soubory: ${data.user.files}\n`;
+        result += `   Chunky: ${data.user.chunks}\n`;
+        result += `   Index: ${data.user.indexPath}\n\n`;
+      }
+
+      if (data.admin) {
+        result += `👑 Admin režim:\n`;
+        result += `   Soubory: ${data.admin.files}\n`;
+        result += `   Chunky: ${data.admin.chunks}\n`;
+        result += `   Index: ${data.admin.indexPath}\n`;
+      }
+
+      setServiceResult(result);
+    } catch (err) {
+      setServiceError(err instanceof Error ? err.message : "Něco se pokazilo");
+    } finally {
+      setServiceLoading(false);
+    }
+  };
+
   return (
     <main className="page">
+      <button
+        className="admin-button"
+        onClick={() => setServiceModalOpen(true)}
+        aria-label="Otevřít servisní funkce"
+        title="Servisní funkce (Cmd/Ctrl+Shift+S)"
+      >
+        ⚙️
+      </button>
       <div className="shell">
         <header className="hero">
           <div>
-            <h1>eSports Chatbot</h1>
+            <h1>KIS Chatbot</h1>
             <p className="lede">
               Přidáváš dotazy, my kombinujeme lokální index a OpenAI. Vše pod
               kontrolou, včetně nákladů.
@@ -174,6 +286,97 @@ export default function Page() {
         </div>
       ) : null}
 
+      {serviceModalOpen ? (
+        <div
+          className="modal-backdrop"
+          onClick={() => setServiceModalOpen(false)}
+        >
+          <div
+            className="modal service-modal"
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <header className="modal-head">
+              <div>
+                <p className="eyebrow">Servisní funkce</p>
+                <h3>Synchronizace a reindexace</h3>
+              </div>
+              <button
+                className="close"
+                onClick={() => {
+                  setServiceModalOpen(false);
+                  setServiceError(null);
+                  setServiceResult(null);
+                  setAdminKey("");
+                }}
+                aria-label="Zavřít servisní modal"
+              >
+                x
+              </button>
+            </header>
+            <div className="modal-body">
+              <div className="service-form">
+                <label>
+                  Admin klíč:
+                  <input
+                    type="password"
+                    value={adminKey}
+                    onChange={(e) => setAdminKey(e.target.value)}
+                    placeholder="Zadejte admin klíč"
+                    className="admin-key-input"
+                    disabled={serviceLoading}
+                    onKeyDown={(e) => {
+                      if (
+                        e.key === "Enter" &&
+                        !serviceLoading &&
+                        adminKey.trim()
+                      ) {
+                        handleSync();
+                      }
+                    }}
+                  />
+                </label>
+
+                <div className="service-actions">
+                  <button
+                    onClick={handleSync}
+                    disabled={serviceLoading || !adminKey.trim()}
+                    className="service-btn"
+                  >
+                    {serviceLoading ? "Probíhá..." : "Synchronizovat"}
+                  </button>
+                  <button
+                    onClick={() => handleReindex(false)}
+                    disabled={serviceLoading || !adminKey.trim()}
+                    className="service-btn"
+                  >
+                    {serviceLoading ? "Probíhá..." : "Reindexovat"}
+                  </button>
+                  <button
+                    onClick={() => handleReindex(true)}
+                    disabled={serviceLoading || !adminKey.trim()}
+                    className="service-btn primary"
+                  >
+                    {serviceLoading ? "Probíhá..." : "Sync + Reindex"}
+                  </button>
+                </div>
+
+                {serviceError && (
+                  <div className="service-error">{serviceError}</div>
+                )}
+
+                {serviceResult && (
+                  <div className="service-result">
+                    <pre>{serviceResult}</pre>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <style jsx>{`
         :global(body) {
           margin: 0;
@@ -191,6 +394,36 @@ export default function Page() {
             ),
             linear-gradient(135deg, #0b111e, #050608 70%);
           padding: 48px 16px 80px;
+          position: relative;
+        }
+        .admin-button {
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          width: 48px;
+          height: 48px;
+          border-radius: 50%;
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          background: rgba(255, 255, 255, 0.05);
+          color: rgba(255, 255, 255, 0.8);
+          font-size: 20px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 150ms ease;
+          z-index: 100;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+        .admin-button:hover {
+          background: rgba(255, 98, 0, 0.15);
+          border-color: rgba(255, 98, 0, 0.4);
+          color: ${PRIMARY};
+          transform: translateY(-2px);
+          box-shadow: 0 6px 16px rgba(255, 98, 0, 0.3);
+        }
+        .admin-button:active {
+          transform: translateY(0);
         }
         .shell {
           max-width: 960px;
@@ -525,6 +758,92 @@ export default function Page() {
           color: rgba(255, 255, 255, 0.6);
           font-size: 0.85rem;
         }
+        .service-modal {
+          max-width: 600px;
+        }
+        .service-form {
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+        }
+        .service-form label {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          font-weight: 600;
+          color: rgba(255, 255, 255, 0.9);
+        }
+        .admin-key-input {
+          padding: 12px 16px;
+          border-radius: 12px;
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          background: rgba(255, 255, 255, 0.05);
+          color: #fff;
+          font-size: 1rem;
+        }
+        .admin-key-input:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+        .service-actions {
+          display: flex;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+        .service-btn {
+          flex: 1;
+          min-width: 120px;
+          padding: 12px 20px;
+          border-radius: 12px;
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          background: rgba(255, 255, 255, 0.05);
+          color: #fff;
+          font-weight: 600;
+          font-size: 0.95rem;
+          cursor: pointer;
+          transition: all 120ms ease;
+        }
+        .service-btn:hover:not(:disabled) {
+          background: rgba(255, 255, 255, 0.1);
+          border-color: rgba(255, 255, 255, 0.2);
+        }
+        .service-btn:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+        .service-btn.primary {
+          background: ${PRIMARY};
+          border-color: ${PRIMARY};
+          color: #0b111e;
+        }
+        .service-btn.primary:hover:not(:disabled) {
+          background: #ff7a33;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(255, 98, 0, 0.3);
+        }
+        .service-error {
+          padding: 12px 16px;
+          border-radius: 12px;
+          background: rgba(255, 59, 48, 0.15);
+          border: 1px solid rgba(255, 59, 48, 0.3);
+          color: #ffb3a6;
+          font-size: 0.9rem;
+        }
+        .service-result {
+          padding: 16px;
+          border-radius: 12px;
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .service-result pre {
+          margin: 0;
+          color: rgba(255, 255, 255, 0.9);
+          font-family: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono",
+            Consolas, "Courier New", monospace;
+          font-size: 0.9rem;
+          white-space: pre-wrap;
+          word-wrap: break-word;
+        }
 
         @media (max-width: 640px) {
           .hero {
@@ -532,6 +851,13 @@ export default function Page() {
           }
           h1 {
             font-size: 1.8rem;
+          }
+          .admin-button {
+            top: 16px;
+            right: 16px;
+            width: 44px;
+            height: 44px;
+            font-size: 18px;
           }
           .composer {
             flex-direction: column;
@@ -543,6 +869,12 @@ export default function Page() {
           .composer button {
             width: 100%;
             padding: 14px;
+          }
+          .service-actions {
+            flex-direction: column;
+          }
+          .service-btn {
+            width: 100%;
           }
         }
       `}</style>
