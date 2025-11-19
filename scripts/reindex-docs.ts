@@ -2,14 +2,14 @@
 /**
  * Reindexace dokumentů
  * 
- * Tento skript načte všechny .md soubory z adresáře docs/,
- * rozdělí je na menší části (chunks), vytvoří embeddingy
- * a uloží index pro vyhledávání.
+ * Tento skript načte JSON data z API, zpracuje je,
+ * vytvoří embeddingy a uloží indexy pro vyhledávání
+ * (separátně pro user a admin režimy).
  * 
  * Spuštění: npx tsx scripts/reindex-docs.ts
  */
 
-import { ingestAllMarkdown } from "../lib/ingest";
+import { ingestAllHelpData } from "../lib/ingest";
 import { resetIndexCache } from "../lib/search";
 
 async function main() {
@@ -18,15 +18,27 @@ async function main() {
   try {
     const startTime = Date.now();
     
-    const result = await ingestAllMarkdown();
+    const result = await ingestAllHelpData();
     
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
     
     console.log("\n✅ Reindexace dokončena!");
-    console.log(`   Soubory: ${result.files}`);
-    console.log(`   Chunky: ${result.chunks}`);
-    console.log(`   Index: ${result.indexPath}`);
-    console.log(`   Čas: ${duration}s`);
+    
+    if (result.user) {
+      console.log("\n📋 User režim:");
+      console.log(`   Soubory: ${result.user.files}`);
+      console.log(`   Chunky: ${result.user.chunks}`);
+      console.log(`   Index: ${result.user.indexPath}`);
+    }
+    
+    if (result.admin) {
+      console.log("\n👑 Admin režim:");
+      console.log(`   Soubory: ${result.admin.files}`);
+      console.log(`   Chunky: ${result.admin.chunks}`);
+      console.log(`   Index: ${result.admin.indexPath}`);
+    }
+    
+    console.log(`\n⏱️  Celkový čas: ${duration}s`);
     
     resetIndexCache();
     console.log("\n🔄 Cache resetována.");
