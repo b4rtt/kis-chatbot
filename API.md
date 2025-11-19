@@ -197,7 +197,7 @@ Chyba serveru:
 # User režim, čeština (výchozí)
 curl -X POST https://kis-chatbot.vercel.app/api/ask \
   -H "Content-Type: application/json" \
-  -H "x-api-key: your_secret_key_here" \
+  -H "x-api-key: qO2wUqi8tYkvQKDf4J9aLGPAerFvQW" \
   -d '{
     "query": "Jak resetovat heslo?",
     "websiteUrl": "https://example.com",

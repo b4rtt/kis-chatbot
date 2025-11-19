@@ -38,10 +38,13 @@ function formatAnswer(answer: string): string | null {
   if (!text) return null;
   const normalized = text.toLowerCase();
   const triggers = [
+    "not in documentation",
     "not in the docs",
     "not in docs",
     "neni v dokumentaci",
     "není v dokumentaci",
+    "information is missing",
+    "information missing",
   ];
   if (triggers.some((phrase) => normalized.includes(phrase))) {
     return null;
