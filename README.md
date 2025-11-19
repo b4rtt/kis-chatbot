@@ -1,4 +1,4 @@
-# eSports Chatbot — Next.js + lokální embeddingy
+# eSports KIS Chatbot — Next.js + lokální embeddingy
 
 Chatbot nad dokumentací, který načítá data z JSON API, vytváří lokální embeddingy a odpovídá pouze z vašeho obsahu. Podporuje dva režimy: **User** a **Admin**, každý s vlastní knowledge base.
 
