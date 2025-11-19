@@ -125,7 +125,10 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     // Pro veřejné API je výchozí includeMarkdown false (plain text), pro interní API true (markdown)
     const defaultIncludeMarkdown = isPublicAPI ? false : true;
-    const { query, websiteUrl, k = 6, includeCitations = false, includeCosts = false, includeMarkdown = defaultIncludeMarkdown } = body;
+    const { query, websiteUrl, k = 6, includeCitations = false, includeCosts = false, includeMarkdown = defaultIncludeMarkdown, isAdmin } = body;
+    
+    // Určit idType: isAdmin="true" => idType=2 (admin), jinak idType=1 (user)
+    const idType: 1 | 2 = (isAdmin === "true" || isAdmin === true) ? 2 : 1;
 
     // 4. Validace povinných parametrů
     if (!query) {
@@ -159,7 +162,7 @@ export async function POST(req: NextRequest) {
     const { embedTexts } = await import("@/lib/localEmbeddings");
     const [qvec] = await embedTexts([query]);
 
-    const index = await loadIndex();
+    const index = await loadIndex(idType);
     const items = index?.items ?? [];
     const vectorPassages = topK(qvec, items, Number(k) || 6);
     const keywordPassages = keywordSearch(query, items, 3);
@@ -247,6 +250,15 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error("API error:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    
+    // Pokud index neexistuje, vrať 404
+    if (errorMessage.includes("not found") || errorMessage.includes("Please run")) {
+      return NextResponse.json(
+        { error: "Not Found", message: errorMessage },
+        { status: 404 }
+      );
+    }
+    
     return NextResponse.json(
       { error: "Internal Server Error", message: errorMessage },
       { status: 500 }

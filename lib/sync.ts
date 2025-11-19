@@ -1,56 +1,75 @@
 import fs from "fs/promises";
 import path from "path";
-import { listMarkdownUrls } from "./crawler";
+import { fetchHelpData, HelpItem } from "./jsonApi";
 
 // Use /tmp on Vercel (read-only filesystem except /tmp)
 const DOCS_DIR = process.env.VERCEL_ENV 
   ? "/tmp/docs" 
   : (process.env.DOCS_DIR ?? "./docs");
-const CACHE_FILE = path.join(DOCS_DIR, ".cache.json");
+const DATA_FILE = path.join(DOCS_DIR, "help-data.json");
 
-type Cache = Record<string, { etag?: string; lastModified?: string }>;
+type Cache = {
+  user?: { lastSync?: string };
+  admin?: { lastSync?: string };
+};
 
 async function readCache(): Promise<Cache> {
-try { return JSON.parse(await fs.readFile(CACHE_FILE, "utf8")); } catch { return {}; }
+  const cacheFile = path.join(DOCS_DIR, ".cache.json");
+  try { 
+    return JSON.parse(await fs.readFile(cacheFile, "utf8")); 
+  } catch { 
+    return {}; 
+  }
 }
+
 async function writeCache(c: Cache) {
-await fs.mkdir(DOCS_DIR, { recursive: true });
-await fs.writeFile(CACHE_FILE, JSON.stringify(c, null, 2), "utf8");
-}
-function urlToLocalPath(u: string) {
-const { hostname, pathname } = new URL(u);
-const safe = pathname.replace(/^\/+/, "");
-return path.join(DOCS_DIR, hostname, safe);
+  await fs.mkdir(DOCS_DIR, { recursive: true });
+  const cacheFile = path.join(DOCS_DIR, ".cache.json");
+  await fs.writeFile(cacheFile, JSON.stringify(c, null, 2), "utf8");
 }
 
-export async function syncDocs() {
-const urls = await listMarkdownUrls();
-const cache = await readCache();
-const changed: string[] = [];
-
-for (const u of urls) {
-const headers: Record<string, string> = {};
-const meta = cache[u];
-if (meta?.etag) headers["If-None-Match"] = meta.etag;
-else if (meta?.lastModified) headers["If-Modified-Since"] = meta.lastModified;
-
-    const r = await fetch(u, { headers });
-    if (r.status === 304) continue;
-    if (!r.ok) continue;
-
-    const etag = r.headers.get("etag") || undefined;
-    const lastModified = r.headers.get("last-modified") || undefined;
-    const text = await r.text();
-
-    const lp = urlToLocalPath(u);
-    await fs.mkdir(path.dirname(lp), { recursive: true });
-    await fs.writeFile(lp, text, "utf8");
-
-    cache[u] = { etag, lastModified };
-    changed.push(lp);
-
+/**
+ * Synchronizuje data z JSON API pro daný typ (user/admin)
+ */
+export async function syncDocs(idType: 1 | 2 = 1) {
+  const cache = await readCache();
+  const cacheKey = idType === 1 ? "user" : "admin";
+  
+  try {
+    const data = await fetchHelpData(idType);
+    
+    // Uložit data do souboru
+    await fs.mkdir(DOCS_DIR, { recursive: true });
+    const filename = idType === 1 ? "help-data-user.json" : "help-data-admin.json";
+    const filePath = path.join(DOCS_DIR, filename);
+    await fs.writeFile(filePath, JSON.stringify(data, null, 2), "utf8");
+    
+    // Aktualizovat cache
+    cache[cacheKey] = { lastSync: new Date().toISOString() };
+    await writeCache(cache);
+    
+    return { 
+      ok: true, 
+      downloaded: data.length, 
+      changedPaths: [filePath],
+      idType 
+    };
+  } catch (error) {
+    console.error(`Sync failed for id_type=${idType}:`, error);
+    throw error;
+  }
 }
 
-await writeCache(cache);
-return { ok: true, downloaded: changed.length, changedPaths: changed };
+/**
+ * Synchronizuje data pro oba typy (user i admin)
+ */
+export async function syncAllDocs() {
+  const userResult = await syncDocs(1);
+  const adminResult = await syncDocs(2);
+  
+  return {
+    ok: true,
+    user: userResult,
+    admin: adminResult,
+  };
 }

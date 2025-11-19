@@ -2,11 +2,25 @@ import { head } from "@vercel/blob";
 import fs from "fs/promises";
 import path from "path";
 
-const DOCS_DIR = process.env.DOCS_DIR ?? "./docs";
-const INDEX_PATH = path.join(DOCS_DIR, "index.json");
+const DOCS_DIR = process.env.VERCEL_ENV 
+  ? "/tmp/docs" 
+  : (process.env.DOCS_DIR ?? "./docs");
 
-export type IndexItem = { id: string; file: string; idx: number; content: string; vector: number[] };
-let _cache: { items: IndexItem[] } | null = null;
+export type IndexItem = { 
+  id: string; 
+  file: string; 
+  idx: number; 
+  content: string; 
+  vector: number[];
+  idType?: 1 | 2; // 1 = user, 2 = admin
+  itemId?: number;
+};
+
+type IndexCache = { items: IndexItem[] };
+const _cache: Record<string, IndexCache | null> = {
+  user: null,
+  admin: null,
+};
 
 function normalizeText(text: string) {
   return text
@@ -15,37 +29,54 @@ function normalizeText(text: string) {
     .toLowerCase();
 }
 
-export async function loadIndex() {
-  if (_cache) return _cache;
+/**
+ * Načte index pro daný typ (user/admin)
+ */
+export async function loadIndex(idType: 1 | 2 = 1) {
+  const cacheKey = idType === 1 ? "user" : "admin";
+  
+  if (_cache[cacheKey]) return _cache[cacheKey]!;
 
+  const indexFilename = idType === 1 ? "index-user.json" : "index-admin.json";
   let raw: string;
+  
   // Use Vercel Blob in production, otherwise use local filesystem
   if (process.env.VERCEL_ENV) {
     try {
-      const blob = await head("index.json", {
+      const blob = await head(indexFilename, {
         token: process.env.BLOB_READ_WRITE_TOKEN,
       });
       const response = await fetch(blob.url);
       if (!response.ok) {
-        throw new Error(`Failed to download index.json from blob storage. Status: ${response.status}`);
+        throw new Error(`Failed to download ${indexFilename} from blob storage. Status: ${response.status}`);
       }
       raw = await response.text();
     } catch (error) {
       if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string' && error.message.includes('not found')) {
-        throw new Error("index.json not found in Vercel Blob storage. Please run the reindexing process.");
+        throw new Error(`${indexFilename} not found in Vercel Blob storage. Please run the reindexing process.`);
       }
       throw error;
     }
   } else {
-    raw = await fs.readFile(INDEX_PATH, "utf8");
+    const indexPath = path.join(DOCS_DIR, indexFilename);
+    try {
+      raw = await fs.readFile(indexPath, "utf8");
+    } catch (error) {
+      if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
+        throw new Error(`${indexFilename} not found. Please run sync and reindex first. Path: ${indexPath}`);
+      }
+      throw error;
+    }
   }
 
-  _cache = JSON.parse(raw);
-  return _cache;
+  const parsed = JSON.parse(raw) as IndexCache;
+  _cache[cacheKey] = parsed;
+  return parsed;
 }
 
 export function resetIndexCache() {
-  _cache = null;
+  _cache.user = null;
+  _cache.admin = null;
 }
 
 export function topK(qvec: number[], items: IndexItem[], k = 6) {

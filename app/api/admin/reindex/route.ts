@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ingestAllMarkdown } from "@/lib/ingest";
-import { syncDocs } from "@/lib/sync";
+import { ingestAllHelpData } from "@/lib/ingest";
+import { syncAllDocs } from "@/lib/sync";
 import { resetIndexCache } from "@/lib/search";
 
 export async function POST(req: NextRequest) {
@@ -13,12 +13,12 @@ export async function POST(req: NextRequest) {
     
     if (doSync) {
       console.log("Starting sync...");
-      const syncResult = await syncDocs();
+      const syncResult = await syncAllDocs();
       console.log("Sync completed:", syncResult);
     }
 
     console.log("Starting ingestion...");
-    const res = await ingestAllMarkdown();
+    const res = await ingestAllHelpData();
     console.log("Ingestion completed:", res);
     resetIndexCache();
     

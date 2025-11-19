@@ -37,10 +37,11 @@ kis@esportsmedia.cz`;
 
 type UseChatOptions = {
   endpoint?: string;
+  admin?: boolean;
 };
 
 export function useChatController(options: UseChatOptions = {}) {
-  const { endpoint = "/api/ask" } = options;
+  const { endpoint = "/api/ask", admin = false } = options;
   const [q, setQ] = useState("");
   const [msgs, setMsgs] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -57,7 +58,13 @@ export function useChatController(options: UseChatOptions = {}) {
       const r = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: question, includeCitations: true, includeCosts: true, includeMarkdown: true }),
+        body: JSON.stringify({ 
+          query: question, 
+          includeCitations: true, 
+          includeCosts: true, 
+          includeMarkdown: true,
+          isAdmin: admin ? "true" : "false"
+        }),
       });
       if (!r.ok) {
         const err = await r.json().catch(() => ({}));
@@ -79,7 +86,7 @@ export function useChatController(options: UseChatOptions = {}) {
     } finally {
       setLoading(false);
     }
-  }, [endpoint, loading, q]);
+  }, [endpoint, loading, q, admin]);
 
   const totals = useMemo(
     () =>

@@ -10,7 +10,8 @@ import {
 const PRIMARY = "#ff6200";
 
 export default function Page() {
-  const { q, setQ, msgs, loading, error, ask, totals } = useChatController();
+  const [adminMode, setAdminMode] = useState(false);
+  const { q, setQ, msgs, loading, error, ask, totals } = useChatController({ admin: adminMode });
   const [openSources, setOpenSources] = useState<{
     question: string;
     citations: Citation[];
@@ -59,6 +60,14 @@ export default function Page() {
         </header>
 
         <section className="composer">
+          <select
+            value={adminMode ? "admin" : "user"}
+            onChange={(e) => setAdminMode(e.target.value === "admin")}
+            className="user-select"
+          >
+            <option value="user">Uživatel</option>
+            <option value="admin">Admin</option>
+          </select>
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -236,6 +245,20 @@ export default function Page() {
           display: flex;
           gap: 12px;
           margin-top: 32px;
+        }
+        .user-select {
+          padding: 16px 20px;
+          border-radius: 14px;
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          background: rgba(255, 255, 255, 0.05);
+          color: #fff;
+          font-size: 1rem;
+          cursor: pointer;
+          min-width: 120px;
+        }
+        .user-select option {
+          background: #0d1220;
+          color: #fff;
         }
         .composer input {
           flex: 1;
@@ -498,6 +521,9 @@ export default function Page() {
           }
           .composer {
             flex-direction: column;
+          }
+          .user-select {
+            width: 100%;
           }
           .composer button {
             width: 100%;
