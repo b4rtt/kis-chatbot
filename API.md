@@ -44,7 +44,9 @@ x-api-key: your_secret_key_here
 ```json
 {
   "query": "Jak resetovat heslo?",
-  "websiteUrl": "https://example.com"
+  "websiteUrl": "https://example.com",
+  "isAdmin": "false",
+  "language": "cs_CZ"
 }
 ```
 
@@ -54,6 +56,8 @@ x-api-key: your_secret_key_here
 | ------------------ | ------- | -------- | ------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | `query`            | string  | ✅ Ano   | -       | Dotaz uživatele                                                                                                                   |
 | `websiteUrl`       | string  | ✅ Ano\* | -       | URL webu, na kterém API běží (\*povinný pouze při použití veřejného API režimu s `x-api-key` header)                              |
+| `isAdmin`          | string  | ❌ Ne    | "false" | Režim knowledge base: `"true"` pro admin režim, `"false"` pro user režim                                                          |
+| `language`         | string  | ❌ Ne    | "cs_CZ" | Locale kód pro jazyk odpovědi (např. `cs_CZ`, `en_US`, `sk_SK`, `de_DE`, `pl_PL`)                                                 |
 | `k`                | number  | ❌ Ne    | 6       | Počet relevantních pasáží k vrácení                                                                                               |
 | `includeCitations` | boolean | ❌ Ne    | false   | Zahrnout citations do odpovědi                                                                                                    |
 | `includeCosts`     | boolean | ❌ Ne    | false   | Zahrnout cost informace do odpovědi                                                                                               |
@@ -163,6 +167,17 @@ Překročen rate limit:
 }
 ```
 
+#### 404 Not Found
+
+Index neexistuje (je potřeba spustit sync a reindex):
+
+```json
+{
+  "error": "Not Found",
+  "message": "index-user.json not found. Please run sync and reindex first. Path: ./docs/index-user.json"
+}
+```
+
 #### 500 Internal Server Error
 
 Chyba serveru:
@@ -179,12 +194,26 @@ Chyba serveru:
 ### cURL
 
 ```bash
+# User režim, čeština (výchozí)
 curl -X POST https://esports-chatbot.vercel.app/api/ask \
   -H "Content-Type: application/json" \
   -H "x-api-key: your_secret_key_here" \
   -d '{
-    "query": "Kdo je Adam Joska?",
-    "websiteUrl": "https://example.com"
+    "query": "Jak resetovat heslo?",
+    "websiteUrl": "https://example.com",
+    "isAdmin": "false",
+    "language": "cs_CZ"
+  }'
+
+# Admin režim, angličtina
+curl -X POST https://esports-chatbot.vercel.app/api/ask \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: your_secret_key_here" \
+  -d '{
+    "query": "How to add a new user?",
+    "websiteUrl": "https://example.com",
+    "isAdmin": "true",
+    "language": "en_US"
   }'
 ```
 
@@ -192,21 +221,20 @@ curl -X POST https://esports-chatbot.vercel.app/api/ask \
 
 ```typescript
 async function askChatbot(query: string, websiteUrl: string) {
-  const response = await fetch(
-    "https://esports-chatbot.vercel.app/api/public/ask",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": "your_secret_key_here",
-      },
-      body: JSON.stringify({
-        query,
-        websiteUrl,
-        k: 6,
-      }),
-    }
-  );
+  const response = await fetch("https://esports-chatbot.vercel.app/api/ask", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": "your_secret_key_here",
+    },
+    body: JSON.stringify({
+      query,
+      websiteUrl,
+      isAdmin: "false",
+      language: "cs_CZ",
+      k: 6,
+    }),
+  });
 
   if (!response.ok) {
     if (response.status === 429) {
@@ -262,8 +290,9 @@ function useChatbotAPI(apiKey: string, websiteUrl: string) {
             body: JSON.stringify({
               query,
               websiteUrl,
+              isAdmin: "false",
+              language: "cs_CZ",
               k: 6,
-              localOnly: false,
             }),
           }
         );
@@ -339,6 +368,8 @@ def ask_chatbot(query: str, website_url: str, api_key: str):
     data = {
         "query": query,
         "websiteUrl": website_url,
+        "isAdmin": "false",
+        "language": "cs_CZ",
         "k": 6,
     }
 
@@ -367,6 +398,23 @@ except Exception as e:
 3. **Cachování**: Pokud je to možné, cachuj odpovědi na stejné dotazy
 4. **Batch requests**: Pokud potřebuješ více dotazů, zkus je spojit do jednoho (pokud API podporuje)
 
-## Podpora
+## Režimy Knowledge Base
 
-Pro dotazy a podporu kontaktujte tým technické podpory.
+API podporuje dva režimy knowledge base:
+
+- **User režim** (`isAdmin: "false"`): Používá knowledge base pro běžné uživatele (id_type=1)
+- **Admin režim** (`isAdmin: "true"`): Používá knowledge base pro administrátory (id_type=2)
+
+Každý režim má vlastní index a obsahuje jiné informace podle typu uživatele.
+
+## Podporované jazyky
+
+API podporuje následující locale kódy pro jazyk odpovědi:
+
+- `cs_CZ` - Čeština (výchozí)
+- `en_US` - English
+- `sk_SK` - Slovenčina
+- `de_DE` - Deutsch
+- `pl_PL` - Polski
+
+Odpovědi budou generovány v zvoleném jazyce, zatímco systémové prompty jsou v angličtině pro lepší kompatibilitu s LLM modely.
